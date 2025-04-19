@@ -1,0 +1,142 @@
+.admin-sidebar {
+  width: 250px;
+  background-color: #2c3e50;
+  color: white;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s;
+  position: sticky;
+  top: 0;
+  
+  &.collapsed {
+    width: 70px;
+    
+    .sidebar-title, .text {
+      display: none;
+    }
+    
+    .sidebar-logo {
+      margin: 0 auto;
+    }
+    
+    .sidebar-nav ul li a {
+      justify-content: center;
+      padding: 12px 0;
+    }
+    
+    .logout-button {
+      justify-content: center;
+    }
+  }
+  
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    
+    .sidebar-logo {
+      width: 35px;
+      height: 35px;
+      margin-right: 10px;
+      background-color: #4a90e2;
+      color: white;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+    
+    .sidebar-title {
+      font-size: 18px;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .collapse-button {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+      
+      &:hover {
+        color: #ddd;
+      }
+    }
+  }
+  
+  .sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      
+      li {
+        margin: 5px 0;
+        
+        a {
+          display: flex;
+          align-items: center;
+          padding: 12px 20px;
+          color: #ddd;
+          text-decoration: none;
+          transition: all 0.2s;
+          
+          &:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+          }
+          
+          .icon {
+            margin-right: 10px;
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+          }
+        }
+        
+        &.active a {
+          background-color: rgba(255, 255, 255, 0.2);
+          color: white;
+          font-weight: 500;
+        }
+      }
+    }
+  }
+  
+  .sidebar-footer {
+    padding: 15px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    
+    .logout-button {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      padding: 10px;
+      background: none;
+      border: none;
+      color: #ddd;
+      cursor: pointer;
+      transition: all 0.2s;
+      
+      &:hover {
+        color: white;
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+      
+      .icon {
+        margin-right: 10px;
+        font-size: 18px;
+      }
+    }
+  }
+}
+
