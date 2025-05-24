@@ -52,21 +52,43 @@ const createBooking = async (bookingData) => {
 /**
  * Get all bookings
  * @param {Object} filter - Filter criteria
+ * @param {number} limit - Maximum number of results
+ * @param {number} skip - Number of documents to skip
  * @returns {Promise<Booking[]>} List of bookings
  */
-const getBookings = async (filter = {}) => {
+const getBookings = async (filter = {}, limit = 10, skip = 0) => {
   const collection = getBookingsCollection()
 
   // Convert fieldId and userId to ObjectId if present
-  if (filter.fieldId) {
+  if (filter.fieldId && typeof filter.fieldId === "string") {
     filter.fieldId = new ObjectId(filter.fieldId)
   }
 
-  if (filter.userId) {
+  if (filter.userId && typeof filter.userId === "string") {
     filter.userId = new ObjectId(filter.userId)
   }
 
-  return collection.find(filter).sort({ createdAt: -1 }).toArray()
+  return collection.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray()
+}
+
+/**
+ * Count bookings based on filter
+ * @param {Object} filter - Filter criteria
+ * @returns {Promise<number>} Count of bookings
+ */
+const countBookings = async (filter = {}) => {
+  const collection = getBookingsCollection()
+
+  // Convert fieldId and userId to ObjectId if present
+  if (filter.fieldId && typeof filter.fieldId === "string") {
+    filter.fieldId = new ObjectId(filter.fieldId)
+  }
+
+  if (filter.userId && typeof filter.userId === "string") {
+    filter.userId = new ObjectId(filter.userId)
+  }
+
+  return collection.countDocuments(filter)
 }
 
 /**
@@ -124,6 +146,7 @@ const deleteBooking = async (id) => {
 module.exports = {
   createBooking,
   getBookings,
+  countBookings,
   getBookingById,
   getBookingsByUser,
   updateBooking,

@@ -14,7 +14,7 @@ const getFieldStatusByDate = async (req, res, next) => {
     return apiResponse(res, 200, "Field status retrieved successfully", { fieldStatus })
   } catch (error) {
     next(error)
-  }
+  } 
 }
 
 /**

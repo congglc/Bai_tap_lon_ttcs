@@ -132,6 +132,23 @@ const deleteClubApplication = async (req, res, next) => {
   }
 }
 
+/**
+ * Upload club application avatar
+ * @route PUT /api/club-applications/:applicationId/avatar
+ */
+const uploadAvatar = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return apiResponse(res, 400, "No file uploaded")
+    }
+    const avatarUrl = require("../config/upload").getClubAvatarUrl(req.file.filename)
+    const application = await clubApplicationService.updateClubApplication(req.params.applicationId, { avatar: avatarUrl })
+    return apiResponse(res, 200, "Avatar uploaded successfully", { application })
+  } catch (error) {
+    next(error)
+  }
+}
+
 module.exports = {
   getClubApplications,
   getClubApplicationById,
@@ -141,4 +158,5 @@ module.exports = {
   approveClubApplication,
   rejectClubApplication,
   deleteClubApplication,
+  uploadAvatar,
 }

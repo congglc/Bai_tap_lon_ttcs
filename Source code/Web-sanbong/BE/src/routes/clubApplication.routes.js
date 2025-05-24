@@ -4,6 +4,7 @@ const { authenticate, authorize } = require("../middlewares/auth.middleware")
 const validate = require("../middlewares/validate.middleware")
 const clubApplicationValidation = require("../validations/clubApplication.validation")
 const constants = require("../config/constants")
+const { uploadClubAvatar } = require("../config/upload")
 
 const router = express.Router()
 
@@ -104,6 +105,18 @@ router.delete(
   authorize(constants.roles.ADMIN),
   validate(clubApplicationValidation.deleteClubApplication),
   clubApplicationController.deleteClubApplication,
+)
+
+/**
+ * @route PUT /api/club-applications/:applicationId/avatar
+ * @desc Upload club application avatar
+ * @access Private (chủ đơn hoặc admin)
+ */
+router.put(
+  "/:applicationId/avatar",
+  authenticate,
+  uploadClubAvatar.single("avatar"),
+  clubApplicationController.uploadAvatar,
 )
 
 module.exports = router

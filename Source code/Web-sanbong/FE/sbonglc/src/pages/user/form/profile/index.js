@@ -5,6 +5,14 @@ import "./style.scss"
 import { FaUserCircle } from "react-icons/fa"
 import { MdOutlineDisabledByDefault } from "react-icons/md"
 import { useNavigate } from "react-router-dom"
+import { userAPI } from "../../../../services/api"
+
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081";
+const getFullAvatarUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return API_URL.replace("/api", "") + url;
+};
 
 const Profile = () => {
   const navigate = useNavigate()
@@ -12,22 +20,42 @@ const Profile = () => {
     name: "",
     email: "",
     phone: "",
-    address: "",
-    bio: "",
+    _id: "",
   })
   const [isEditing, setIsEditing] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarUrl, setAvatarUrl] = useState("")
 
   // Lấy thông tin người dùng từ localStorage khi component được mount
   useEffect(() => {
-    const storedUserInfo = localStorage.getItem("userInfo")
-    if (storedUserInfo) {
-      setUserInfo({ ...JSON.parse(storedUserInfo), bio: JSON.parse(storedUserInfo).bio || "" })
-    } else {
-      // Nếu chưa đăng nhập, chuyển hướng về trang đăng nhập
-      navigate("/dang-nhap")
+    const fetchUser = async () => {
+      const storedUserInfo = localStorage.getItem("userInfo")
+      let user = storedUserInfo ? JSON.parse(storedUserInfo) : null
+
+      // Nếu có token và userId, luôn lấy user mới nhất từ backend
+      if (user && user._id && localStorage.getItem("token")) {
+        try {
+          const res = await userAPI.getUserById(user._id)
+          if (res.data && res.data.user) {
+            user = res.data.user
+            localStorage.setItem("userInfo", JSON.stringify(user))
+          }
+        } catch {}
+      }
+
+      if (user) {
+        setUserInfo(user)
+        setAvatarUrl(getFullAvatarUrl(user.avatar))
+      } else {
+        navigate("/dang-nhap")
+      }
     }
+    fetchUser()
   }, [navigate])
+
+  // Thêm log kiểm tra avatarUrl và userInfo trước khi render
+  console.log("avatarUrl:", avatarUrl, "userInfo:", userInfo);
 
   const handleExitClick = () => {
     navigate(-1) // Sử dụng navigate(-1) để quay lại trang trước đó
@@ -47,7 +75,14 @@ const Profile = () => {
     if (isEditing) {
       const storedUserInfo = localStorage.getItem("userInfo")
       if (storedUserInfo) {
-        setUserInfo({ ...JSON.parse(storedUserInfo), bio: JSON.parse(storedUserInfo).bio || "" })
+        const user = JSON.parse(storedUserInfo)
+        setUserInfo({
+          name: user.name || "",
+          email: user.email || "",
+          phone: user.phone || "",
+          _id: user._id || "",
+        })
+        setAvatarUrl(getFullAvatarUrl(user.avatar))
       }
     }
   }
@@ -72,6 +107,32 @@ const Profile = () => {
     navigate("/")
   }
 
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setAvatarFile(file)
+      setAvatarUrl(URL.createObjectURL(file))
+      if (userInfo._id) {
+        const formData = new FormData()
+        formData.append("avatar", file)
+        try {
+          const res = await userAPI.uploadAvatar(userInfo._id, formData)
+          if (res.data && res.data.user && res.data.user.avatar) {
+            setAvatarUrl(getFullAvatarUrl(res.data.user.avatar))
+            // Lấy user mới nhất từ backend
+            const userRes = await userAPI.getUserById(userInfo._id)
+            if (userRes.data && userRes.data.user) {
+              setUserInfo(userRes.data.user)
+              localStorage.setItem("userInfo", JSON.stringify(userRes.data.user))
+            }
+          }
+        } catch (err) {
+          alert("Upload ảnh thất bại!")
+        }
+      }
+    }
+  }
+
   return (
     <div className="profile-container">
       <div className="profile-card">
@@ -84,14 +145,39 @@ const Profile = () => {
 
         <div className="avatar-section">
           <div className="avatar-placeholder">
-            <FaUserCircle className="avatar-icon" />
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="avatar" className="avatar-img" />
+            ) : (
+              <FaUserCircle className="avatar-icon" />
+            )}
           </div>
           <div className="avatar-actions">
             <p>Tải ảnh lên</p>
-            <button className="upload-button" disabled={!isEditing}>
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              id="avatar-upload"
+              onChange={handleAvatarChange}
+              disabled={!isEditing}
+            />
+            <button
+              type="button"
+              className="upload-button"
+              disabled={!isEditing}
+              onClick={() => document.getElementById('avatar-upload').click()}
+            >
               Chọn ảnh
             </button>
-            <button className="remove-button" disabled={!isEditing}>
+            <button
+              className="remove-button"
+              disabled={!isEditing || !avatarUrl}
+              onClick={() => {
+                setAvatarFile(null)
+                setAvatarUrl("")
+                // Có thể gọi API xóa avatar nếu muốn
+              }}
+            >
               Xóa
             </button>
           </div>
@@ -130,31 +216,6 @@ const Profile = () => {
             id="phone"
             name="phone"
             value={userInfo.phone}
-            onChange={handleInputChange}
-            readOnly={!isEditing}
-            className={!isEditing ? "readonly" : ""}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="address">Địa chỉ</label>
-          <input
-            type="text"
-            id="address"
-            name="address"
-            value={userInfo.address}
-            onChange={handleInputChange}
-            readOnly={!isEditing}
-            className={!isEditing ? "readonly" : ""}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="bio">Giới thiệu bản thân</label>
-          <textarea
-            id="bio"
-            name="bio"
-            value={userInfo.bio}
             onChange={handleInputChange}
             readOnly={!isEditing}
             className={!isEditing ? "readonly" : ""}

@@ -146,6 +146,18 @@
           font-weight: 500;
           color: #333;
         }
+        
+        .avatar-img {
+          width: 36px;
+          height: 36px;
+          object-fit: cover;
+          border-radius: 50%;
+          border: 2px solid #eee;
+          background: #fff;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+          margin-right: 8px;
+          display: inline-block;
+        }
       }
       
       .dropdown-menu {

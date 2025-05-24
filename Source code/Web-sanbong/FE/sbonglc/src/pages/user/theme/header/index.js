@@ -6,6 +6,13 @@ import { ROUTERS } from "utils/router"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { FaUserCircle } from "react-icons/fa"
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081";
+const getFullAvatarUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return API_URL.replace("/api", "") + url;
+};
+
 const Header = () => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -91,7 +98,11 @@ const Header = () => {
               {userInfo ? (
                 <div className="user-profile" ref={dropdownRef}>
                   <div className="avatar" onClick={toggleDropdown}>
-                    <FaUserCircle className="avatar-icon" />
+                    {userInfo.avatar ? (
+                      <img src={getFullAvatarUrl(userInfo.avatar)} alt="avatar" className="avatar-img" />
+                    ) : (
+                      <FaUserCircle className="avatar-icon" />
+                    )}
                     <span className="user-name">{userInfo.name}</span>
                   </div>
                   {showDropdown && (

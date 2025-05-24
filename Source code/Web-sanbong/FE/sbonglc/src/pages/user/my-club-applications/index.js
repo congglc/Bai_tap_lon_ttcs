@@ -1,85 +1,71 @@
 "use client"
 
-import { memo, useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import "./style.scss"
 import { useNavigate } from "react-router-dom"
 import { MdOutlineDisabledByDefault } from "react-icons/md"
+import { clubApplicationAPI } from "../../../services/api"
+import { formatDate } from "../../../utils/formatDate"
+
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081";
+const getFullAvatarUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return API_URL.replace("/api", "") + url;
+};
 
 const MyClubApplications = () => {
   const navigate = useNavigate()
   const [applications, setApplications] = useState([])
   const [userInfo, setUserInfo] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     window.scrollTo(0, 0)
 
-    // Kiểm tra đăng nhập
     const storedUserInfo = localStorage.getItem("userInfo")
     if (!storedUserInfo) {
       navigate("/dang-nhap")
       return
     }
 
-    setUserInfo(JSON.parse(storedUserInfo))
-
-    // Mô phỏng việc lấy đơn đăng ký CLB của người dùng
-    // Trong thực tế, dữ liệu này sẽ được lấy từ API dựa trên ID người dùng
-    setIsLoading(true)
-
-    // Giả lập dữ liệu đơn đăng ký CLB
-    const userEmail = JSON.parse(storedUserInfo).email
-
-    // Lấy danh sách đơn đăng ký từ localStorage (nếu có)
-    const allApplications = JSON.parse(localStorage.getItem("clubApplications") || "[]")
-
-    // Lọc đơn đăng ký của người dùng hiện tại (dựa vào email)
-    const userApplications = allApplications.filter((app) => app.email === userEmail)
-
-    // Nếu không có đơn nào, tạo một đơn mẫu
-    if (userApplications.length === 0) {
-      const mockApplication = {
-        id: Date.now(),
-        fullName: JSON.parse(storedUserInfo).name,
-        email: userEmail,
-        phone: JSON.parse(storedUserInfo).phone,
-        address: JSON.parse(storedUserInfo).address || "Hà Nội",
-        bio: "Tôi là một người đam mê bóng đá từ nhỏ và muốn tham gia CLB để rèn luyện kỹ năng.",
-        footballSkill: "Tôi có thể chơi ở vị trí tiền vệ, có khả năng chuyền bóng tốt.",
-        status: "pending",
-        submittedAt: new Date().toISOString(),
-        avatar: null,
-      }
-
-      setApplications([mockApplication])
-    } else {
-      setApplications(userApplications)
-    }
-
-    setIsLoading(false)
+    const userInfoObj = JSON.parse(storedUserInfo)
+    setUserInfo(userInfoObj)
+    fetchUserApplications(userInfoObj)
   }, [navigate])
 
+  const fetchUserApplications = async (user) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      if (user._id) {
+        const response = await clubApplicationAPI.getClubApplicationsByUser(user._id)
+        setApplications(response.data.data.applications)
+      } else {
+        const response = await clubApplicationAPI.getClubApplications()
+        const userApplications = response.data.data.applications.filter(
+          app => app.email === user.email
+        )
+        setApplications(userApplications)
+      }
+    } catch (err) {
+      console.error("Error fetching club applications:", err)
+      setError("Không thể tải danh sách đơn đăng ký CLB. Vui lòng thử lại sau.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleExitClick = () => {
-    navigate(-1) // Quay lại trang trước
+    navigate(-1)
   }
 
   const handleApplyNow = () => {
-    navigate("/dang-ky-club") // Chuyển đến trang đăng ký CLB
+    navigate("/dang-ky-club")
   }
 
-  // Format ngày tháng
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  // Lấy class CSS cho trạng thái
   const getStatusClass = (status) => {
     switch (status) {
       case "approved":
@@ -93,7 +79,6 @@ const MyClubApplications = () => {
     }
   }
 
-  // Lấy text cho trạng thái
   const getStatusText = (status) => {
     switch (status) {
       case "approved":
@@ -121,6 +106,13 @@ const MyClubApplications = () => {
           <div className="loading-spinner"></div>
           <p>Đang tải dữ liệu...</p>
         </div>
+      ) : error ? (
+        <div className="error-message">
+          <p>{error}</p>
+          <button className="retry-button" onClick={() => fetchUserApplications(userInfo)}>
+            Thử lại
+          </button>
+        </div>
       ) : (
         <div className="applications-content">
           {applications.length === 0 ? (
@@ -133,13 +125,15 @@ const MyClubApplications = () => {
           ) : (
             <div className="applications-list">
               {applications.map((application) => (
-                <div className="application-card" key={application.id}>
+                <div className="application-card" key={application._id}>
                   <div className="application-header">
                     <div className="avatar-container">
                       {application.avatar ? (
-                        <img src={application.avatar || "/placeholder.svg"} alt="Avatar" />
+                        <img src={getFullAvatarUrl(application.avatar) || "/placeholder.svg"} alt="Avatar" />
                       ) : (
-                        <div className="avatar-placeholder">{application.fullName.charAt(0)}</div>
+                        <div className="avatar-placeholder">
+                          {application.fullName.charAt(0)}
+                        </div>
                       )}
                     </div>
                     <div className="application-status">
@@ -151,18 +145,10 @@ const MyClubApplications = () => {
 
                   <div className="application-details">
                     <h3>{application.fullName}</h3>
-                    <p>
-                      <strong>Email:</strong> {application.email}
-                    </p>
-                    <p>
-                      <strong>Số điện thoại:</strong> {application.phone}
-                    </p>
-                    <p>
-                      <strong>Địa chỉ:</strong> {application.address}
-                    </p>
-                    <p>
-                      <strong>Ngày đăng ký:</strong> {formatDate(application.submittedAt)}
-                    </p>
+                    <p><strong>Email:</strong> {application.email}</p>
+                    <p><strong>Số điện thoại:</strong> {application.phone}</p>
+                    <p><strong>Địa chỉ:</strong> {application.address}</p>
+                    <p><strong>Ngày đăng ký:</strong> {formatDate(application.submittedAt)}</p>
 
                     <div className="application-section">
                       <h4>Giới thiệu bản thân</h4>
@@ -207,5 +193,4 @@ const MyClubApplications = () => {
   )
 }
 
-export default memo(MyClubApplications)
-
+export default MyClubApplications

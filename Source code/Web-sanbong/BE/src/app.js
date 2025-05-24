@@ -6,6 +6,7 @@ const { connectToDatabase } = require("./config/database")
 const routes = require("./routes")
 const errorMiddleware = require("./middlewares/error.middleware")
 const logger = require("./utils/logger")
+const path = require("path")
 
 // Initialize express app
 const app = express()
@@ -20,10 +21,34 @@ connectToDatabase()
 
 // Middlewares
 app.use(helmet())
-app.use(cors())
+
+// Cập nhật cấu hình CORS
+const corsOptions = {
+  origin: process.env.FRONTEND_URL ,
+  credentials: true,
+  optionsSuccessStatus: 200,
+}
+
+// Thay thế dòng app.use(cors()) hiện tại
+app.use(cors(corsOptions))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(morgan("dev"))
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "../public/uploads"), {
+    setHeaders: (res, filePath) => {
+      res.set("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "*");
+      res.set("Cross-Origin-Resource-Policy", "cross-origin");
+      if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
+        res.set("Content-Type", "image/jpeg");
+      }
+      if (filePath.endsWith(".png")) {
+        res.set("Content-Type", "image/png");
+      }
+    },
+  })
+)
 
 // Routes
 app.use("/api", routes)
