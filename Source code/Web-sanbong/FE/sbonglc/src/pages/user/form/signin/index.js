@@ -5,10 +5,11 @@ import "./style.scss"
 import { ROUTERS } from "utils/router"
 import { useNavigate } from "react-router-dom"
 import { FaEye, FaEyeSlash, FaTimes } from "react-icons/fa"
+import { authAPI } from "../../../../services/api"
 
 const Signin = () => {
   const [passwordVisible, setPasswordVisible] = useState(false)
-  const [phone, setPhone] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const navigate = useNavigate()
@@ -21,27 +22,41 @@ const Signin = () => {
     navigate(ROUTERS.USER.HOME)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
 
     // Kiểm tra đăng nhập đơn giản (trong thực tế sẽ gọi API)
-    if (phone === "0123456789" && password === "password") {
-      // Tạo thông tin người dùng mẫu
-      const userInfo = {
-        name: "Nguyễn Văn A",
-        phone: phone,
-        email: "nguyenvana@example.com",
-        address: "Hà Nội",
-        isLoggedIn: true,
-      }
+    // if (phone === "0123456789" && password === "password") {
+    //   // Tạo thông tin người dùng mẫu
+    //   const userInfo = {
+    //     name: "Nguyễn Văn A",
+    //     phone: phone,
+    //     email: "nguyenvana@example.com",
+    //     address: "Hà Nội",
+    //     isLoggedIn: true,
+    //   }
 
-      // Lưu thông tin người dùng vào localStorage
-      localStorage.setItem("userInfo", JSON.stringify(userInfo))
+    //   // Lưu thông tin người dùng vào localStorage
+    //   localStorage.setItem("userInfo", JSON.stringify(userInfo))
 
+    //   // Chuyển hướng về trang chủ
+    //   navigate(ROUTERS.USER.HOME)
+    // } else {
+    //   setError("Số điện thoại hoặc mật khẩu không đúng")
+    // }
+
+    try {
+      const res = await authAPI.login({ email, password })
+      // Lưu thông tin user hoặc token nếu cần
+      localStorage.setItem("userInfo", JSON.stringify(res.data.data.user))
+      // Có thể lưu thêm token nếu API trả về token
+      // localStorage.setItem("token", res.data.data.token);
+      // localStorage.setItem("refreshToken", res.data.data.refreshToken);
       // Chuyển hướng về trang chủ
       navigate(ROUTERS.USER.HOME)
-    } else {
-      setError("Số điện thoại hoặc mật khẩu không đúng")
+    } catch (err) {
+      console.error("Login error:", err)
+      setError("Số điện thoại hoặc mật khẩu không đúng") // Hiển thị lỗi từ server hoặc lỗi mặc định
     }
   }
 
@@ -57,13 +72,13 @@ const Signin = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="phone">Phone</label>
+            <label htmlFor="email">Email</label>
             <input
-              type="tel"
-              id="phone"
-              placeholder="Enter your phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              type="email"
+              id="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>

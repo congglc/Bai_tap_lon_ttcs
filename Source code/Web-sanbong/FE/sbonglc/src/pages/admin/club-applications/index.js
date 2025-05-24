@@ -4,6 +4,15 @@ import { memo, useState, useEffect } from "react"
 import "./style.scss"
 import AdminSidebar from "../components/Sidebar"
 import { FaCheck, FaTimes, FaEye } from "react-icons/fa"
+import { clubApplicationAPI } from "../../../services/api"
+import { formatDate } from "../../../utils/formatDate"
+
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081";
+const getFullAvatarUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return API_URL.replace("/api", "") + url;
+};
 
 const Button = ({ children, variant = "primary", type = "button", onClick, disabled = false }) => {
   return (
@@ -21,113 +30,79 @@ const Button = ({ children, variant = "primary", type = "button", onClick, disab
 const ClubApplications = () => {
   const [applications, setApplications] = useState([])
   const [selectedApplication, setSelectedApplication] = useState(null)
-  const [filter, setFilter] = useState("pending") // pending, approved, rejected
+  const [filter, setFilter] = useState("pending") // pending, approved, rejected, all
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Mô phỏng dữ liệu đơn đăng ký
-  useEffect(() => {
-    // Trong thực tế, dữ liệu này sẽ được lấy từ API
-    const mockApplications = [
-      {
-        id: 1,
-        fullName: "Nguyễn Văn A",
-        email: "nguyenvana@example.com",
-        phone: "0987654321",
-        address: "Hà Nội",
-        bio: "Tôi là một người đam mê bóng đá từ nhỏ và đã chơi trong đội bóng trường đại học.",
-        footballSkill: "Tôi có thể chơi ở vị trí tiền vệ trung tâm, có khả năng chuyền bóng tốt và tầm nhìn sân rộng.",
-        status: "pending",
-        submittedAt: "2023-03-15T08:30:00Z",
-        avatar: null,
-      },
-      {
-        id: 2,
-        fullName: "Trần Thị B",
-        email: "tranthib@example.com",
-        phone: "0912345678",
-        address: "Hồ Chí Minh",
-        bio: "Tôi là huấn luyện viên bóng đá trẻ và muốn tham gia CLB để nâng cao kỹ năng.",
-        footballSkill: "Tôi có 5 năm kinh nghiệm huấn luyện đội bóng trẻ, am hiểu chiến thuật và kỹ thuật cơ bản.",
-        status: "approved",
-        submittedAt: "2023-03-10T14:20:00Z",
-        approvedAt: "2023-03-12T09:15:00Z",
-        avatar: null,
-      },
-      {
-        id: 3,
-        fullName: "Lê Văn C",
-        email: "levanc@example.com",
-        phone: "0978123456",
-        address: "Đà Nẵng",
-        bio: "Tôi muốn tham gia CLB để rèn luyện sức khỏe và kết bạn với những người có cùng đam mê.",
-        footballSkill: "Tôi mới chơi bóng được 1 năm, kỹ năng còn hạn chế nhưng rất nhiệt tình và chăm chỉ tập luyện.",
-        status: "rejected",
-        submittedAt: "2023-03-08T10:45:00Z",
-        rejectedAt: "2023-03-09T16:30:00Z",
-        rejectionReason: "Không đáp ứng yêu cầu kỹ thuật tối thiểu của CLB",
-        avatar: null,
-      },
-      {
-        id: 4,
-        fullName: "Phạm Văn D",
-        email: "phamvand@example.com",
-        phone: "0965432109",
-        address: "Hải Phòng",
-        bio: "Tôi đã chơi bóng đá chuyên nghiệp trong 3 năm và muốn tìm một CLB để duy trì phong độ.",
-        footballSkill:
-          "Tôi có kinh nghiệm thi đấu ở giải hạng Nhất, chơi ở vị trí tiền đạo cánh với tốc độ tốt và khả năng dứt điểm.",
-        status: "pending",
-        submittedAt: "2023-03-14T11:20:00Z",
-        avatar: null,
-      },
-      {
-        id: 5,
-        fullName: "Hoàng Thị E",
-        email: "hoangthie@example.com",
-        phone: "0932109876",
-        address: "Cần Thơ",
-        bio: "Tôi là người mới bắt đầu chơi bóng đá và muốn học hỏi từ những người có kinh nghiệm.",
-        footballSkill: "Tôi mới tập chơi bóng được vài tháng, còn nhiều hạn chế nhưng rất đam mê và quyết tâm học hỏi.",
-        status: "pending",
-        submittedAt: "2023-03-16T09:10:00Z",
-        avatar: null,
-      },
-    ]
-
-    setApplications(mockApplications)
-  }, [])
-
-  const handleViewApplication = (application) => {
-    setSelectedApplication(application)
-  }
-
-  const handleApproveApplication = (id) => {
-    setApplications(
-      applications.map((app) =>
-        app.id === id ? { ...app, status: "approved", approvedAt: new Date().toISOString() } : app,
-      ),
-    )
-
-    if (selectedApplication && selectedApplication.id === id) {
-      setSelectedApplication({ ...selectedApplication, status: "approved", approvedAt: new Date().toISOString() })
+  // Fetch club applications from API
+  const fetchApplications = async (status = null) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await clubApplicationAPI.getClubApplications(status !== "all" ? status : null)
+      setApplications(response.data.data.applications)
+    } catch (err) {
+      console.error("Error fetching club applications:", err)
+      setError("Không thể tải danh sách đơn đăng ký CLB. Vui lòng thử lại sau.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleRejectApplication = (id, reason = "Không đáp ứng yêu cầu") => {
-    setApplications(
-      applications.map((app) =>
-        app.id === id
-          ? { ...app, status: "rejected", rejectedAt: new Date().toISOString(), rejectionReason: reason }
-          : app,
-      ),
-    )
+  useEffect(() => {
+    fetchApplications(filter)
+  }, [filter])
 
-    if (selectedApplication && selectedApplication.id === id) {
-      setSelectedApplication({
-        ...selectedApplication,
-        status: "rejected",
-        rejectedAt: new Date().toISOString(),
-        rejectionReason: reason,
-      })
+  const handleViewApplication = async (applicationId) => {
+    try {
+      setIsLoading(true)
+      const response = await clubApplicationAPI.getClubApplicationById(applicationId)
+      setSelectedApplication(response.data.data.application)
+    } catch (err) {
+      console.error("Error fetching application details:", err)
+      alert("Không thể tải chi tiết đơn đăng ký. Vui lòng thử lại sau.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleApproveApplication = async (id) => {
+    try {
+      await clubApplicationAPI.approveClubApplication(id)
+
+      // Refresh application list
+      fetchApplications(filter)
+
+      // Update selected application if it's the one being approved
+      if (selectedApplication && selectedApplication._id === id) {
+        const response = await clubApplicationAPI.getClubApplicationById(id)
+        setSelectedApplication(response.data.data.application)
+      }
+
+      alert("Đơn đăng ký đã được duyệt thành công!")
+    } catch (err) {
+      console.error("Error approving application:", err)
+      alert("Không thể duyệt đơn đăng ký. Vui lòng thử lại sau.")
+    }
+  }
+
+  const handleRejectApplication = async (id, reason = "Không đáp ứng yêu cầu") => {
+    try {
+      await clubApplicationAPI.rejectClubApplication(id, reason)
+
+      // Refresh application list
+      fetchApplications(filter)
+
+      // Update selected application if it's the one being rejected
+      if (selectedApplication && selectedApplication._id === id) {
+        const response = await clubApplicationAPI.getClubApplicationById(id)
+        setSelectedApplication(response.data.data.application)
+      }
+
+      alert("Đơn đăng ký đã bị từ chối!")
+    } catch (err) {
+      console.error("Error rejecting application:", err)
+      alert("Không thể từ chối đơn đăng ký. Vui lòng thử lại sau.")
     }
   }
 
@@ -135,20 +110,32 @@ const ClubApplications = () => {
     setSelectedApplication(null)
   }
 
-  const filteredApplications = applications.filter((app) => {
-    if (filter === "all") return true
-    return app.status === filter
-  })
+  // Lấy class CSS cho trạng thái
+  const getStatusClass = (status) => {
+    switch (status) {
+      case "approved":
+        return "status-approved"
+      case "pending":
+        return "status-pending"
+      case "rejected":
+        return "status-rejected"
+      default:
+        return ""
+    }
+  }
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+  // Lấy text cho trạng thái
+  const getStatusText = (status) => {
+    switch (status) {
+      case "approved":
+        return "Đã duyệt"
+      case "pending":
+        return "Chờ duyệt"
+      case "rejected":
+        return "Từ chối"
+      default:
+        return status
+    }
   }
 
   return (
@@ -182,73 +169,88 @@ const ClubApplications = () => {
           </div>
         </div>
 
-        <div className="applications-container">
-          <table className="applications-table">
-            <thead>
-              <tr>
-                <th>Họ tên</th>
-                <th>Email</th>
-                <th>Số điện thoại</th>
-                <th>Ngày đăng ký</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredApplications.length === 0 ? (
+        {isLoading && !selectedApplication ? (
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>Đang tải dữ liệu...</p>
+          </div>
+        ) : error ? (
+          <div className="error-message">
+            <p>{error}</p>
+            <Button variant="primary" onClick={() => fetchApplications(filter)}>
+              Thử lại
+            </Button>
+          </div>
+        ) : (
+          <div className="applications-container">
+            <table className="applications-table">
+              <thead>
                 <tr>
-                  <td colSpan="6" className="no-data">
-                    Không có đơn đăng ký nào
-                  </td>
+                  <th>Họ tên</th>
+                  <th>Email</th>
+                  <th>Số điện thoại</th>
+                  <th>Ngày đăng ký</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
                 </tr>
-              ) : (
-                filteredApplications.map((application) => (
-                  <tr key={application.id}>
-                    <td>{application.fullName}</td>
-                    <td>{application.email}</td>
-                    <td>{application.phone}</td>
-                    <td>{formatDate(application.submittedAt)}</td>
-                    <td>
-                      <span className={`status-badge status-${application.status}`}>
-                        {application.status === "pending" && "Chờ duyệt"}
-                        {application.status === "approved" && "Đã duyệt"}
-                        {application.status === "rejected" && "Từ chối"}
-                      </span>
-                    </td>
-                    <td className="action-buttons">
-                      <button
-                        className="view-button"
-                        onClick={() => handleViewApplication(application)}
-                        title="Xem chi tiết"
-                      >
-                        <FaEye />
-                      </button>
-
-                      {application.status === "pending" && (
-                        <>
-                          <button
-                            className="approve-button"
-                            onClick={() => handleApproveApplication(application.id)}
-                            title="Duyệt đơn"
-                          >
-                            <FaCheck />
-                          </button>
-                          <button
-                            className="reject-button"
-                            onClick={() => handleRejectApplication(application.id)}
-                            title="Từ chối"
-                          >
-                            <FaTimes />
-                          </button>
-                        </>
-                      )}
+              </thead>
+              <tbody>
+                {applications.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="no-data">
+                      Không có đơn đăng ký nào
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  applications.map((application) => (
+                    <tr key={application._id}>
+                      <td>{application.fullName}</td>
+                      <td>{application.email}</td>
+                      <td>{application.phone}</td>
+                      <td>{formatDate(application.submittedAt)}</td>
+                      <td>
+                        <span className={`status-badge status-${application.status}`}>
+                          {getStatusText(application.status)}
+                        </span>
+                      </td>
+                      <td className="action-buttons">
+                        <button
+                          className="view-button"
+                          onClick={() => handleViewApplication(application._id)}
+                          title="Xem chi tiết"
+                        >
+                          <FaEye />
+                        </button>
+
+                        {application.status === "pending" && (
+                          <>
+                            <button
+                              className="approve-button"
+                              onClick={() => handleApproveApplication(application._id)}
+                              title="Duyệt đơn"
+                            >
+                              <FaCheck />
+                            </button>
+                            <button
+                              className="reject-button"
+                              onClick={() => {
+                                const reason = window.prompt("Nhập lý do từ chối:")
+                                if (reason) handleRejectApplication(application._id, reason)
+                              }}
+                              title="Từ chối"
+                            >
+                              <FaTimes />
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {selectedApplication && (
           <div className="application-detail-modal">
@@ -264,7 +266,7 @@ const ClubApplications = () => {
                 <div className="detail-header">
                   <div className="avatar-container">
                     {selectedApplication.avatar ? (
-                      <img src={selectedApplication.avatar || "/placeholder.svg"} alt="Avatar" />
+                      <img src={getFullAvatarUrl(selectedApplication.avatar) || "/placeholder.svg"} alt="Avatar" />
                     ) : (
                       <div className="avatar-placeholder">{selectedApplication.fullName.charAt(0)}</div>
                     )}
@@ -277,9 +279,7 @@ const ClubApplications = () => {
                     <p className="address">{selectedApplication.address}</p>
                     <p className="submitted-date">Ngày đăng ký: {formatDate(selectedApplication.submittedAt)}</p>
                     <span className={`status-badge status-${selectedApplication.status}`}>
-                      {selectedApplication.status === "pending" && "Chờ duyệt"}
-                      {selectedApplication.status === "approved" && "Đã duyệt"}
-                      {selectedApplication.status === "rejected" && "Từ chối"}
+                      {getStatusText(selectedApplication.status)}
                     </span>
                   </div>
                 </div>
@@ -316,13 +316,13 @@ const ClubApplications = () => {
                       onClick={() => {
                         const reason = window.prompt("Nhập lý do từ chối:")
                         if (reason) {
-                          handleRejectApplication(selectedApplication.id, reason)
+                          handleRejectApplication(selectedApplication._id, reason)
                         }
                       }}
                     >
                       Từ chối đơn
                     </Button>
-                    <Button variant="primary" onClick={() => handleApproveApplication(selectedApplication.id)}>
+                    <Button variant="primary" onClick={() => handleApproveApplication(selectedApplication._id)}>
                       Duyệt đơn
                     </Button>
                   </div>
@@ -337,4 +337,3 @@ const ClubApplications = () => {
 }
 
 export default memo(ClubApplications)
-

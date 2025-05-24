@@ -4,6 +4,8 @@ import { memo, useState, useEffect } from "react"
 import "./style.scss"
 import AdminSidebar from "../components/Sidebar"
 import { FaEye, FaEdit, FaTrash, FaPlus, FaTimes, FaSearch } from "react-icons/fa"
+import { userAPI } from "../../../services/api"
+import { formatDate } from "../../../utils/formatDate"
 
 const Button = ({ children, variant = "primary", type = "button", onClick, disabled = false }) => {
   return (
@@ -24,6 +26,14 @@ const UserManagement = () => {
   const [showForm, setShowForm] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    limit: 10,
+    total: 0,
+  })
   const [userData, setUserData] = useState({
     id: null,
     name: "",
@@ -35,80 +45,41 @@ const UserManagement = () => {
     registeredAt: "",
     bio: "",
   })
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "user",
+    status: "active",
+  })
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [selectedRole, setSelectedRole] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [isBlocked, setIsBlocked] = useState(false);
 
-  // Lấy dữ liệu người dùng từ localStorage khi component được mount
-  useEffect(() => {
-    // Lấy dữ liệu từ localStorage
-    let storedUsers = JSON.parse(localStorage.getItem("users") || "[]")
-
-    // Nếu không có dữ liệu, tạo dữ liệu mẫu
-    if (storedUsers.length === 0) {
-      const sampleUsers = [
-        {
-          id: 1,
-          name: "Nguyễn Văn A",
-          email: "nguyenvana@example.com",
-          phone: "0987654321",
-          address: "Hà Nội",
-          role: "admin",
-          status: "active",
-          registeredAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 ngày trước
-          bio: "Quản trị viên hệ thống",
-        },
-        {
-          id: 2,
-          name: "Trần Thị B",
-          email: "tranthib@example.com",
-          phone: "0912345678",
-          address: "Hồ Chí Minh",
-          role: "user",
-          status: "active",
-          registeredAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(), // 15 ngày trước
-          bio: "Người dùng thường xuyên đặt sân",
-        },
-        {
-          id: 3,
-          name: "Lê Văn C",
-          email: "levanc@example.com",
-          phone: "0978123456",
-          address: "Đà Nẵng",
-          role: "user",
-          status: "inactive",
-          registeredAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 ngày trước
-          bio: "Người dùng không hoạt động",
-        },
-        {
-          id: 4,
-          name: "Phạm Văn D",
-          email: "phamvand@example.com",
-          phone: "0965432109",
-          address: "Hải Phòng",
-          role: "manager",
-          status: "active",
-          registeredAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 ngày trước
-          bio: "Quản lý sân bóng",
-        },
-        {
-          id: 5,
-          name: "Hoàng Thị E",
-          email: "hoangthie@example.com",
-          phone: "0932109876",
-          address: "Cần Thơ",
-          role: "user",
-          status: "active",
-          registeredAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 ngày trước
-          bio: "Người dùng mới đăng ký",
-        },
-      ]
-
-      storedUsers = sampleUsers
-      localStorage.setItem("users", JSON.stringify(sampleUsers))
+  // Fetch users from API
+  const fetchUsers = async (page = 1) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await userAPI.getUsers(page, pagination.limit)
+      setUsers(response.data.data.users)
+      setPagination(response.data.data.pagination)
+    } catch (err) {
+      console.error("Error fetching users:", err)
+      setError("Không thể tải danh sách người dùng. Vui lòng thử lại sau.")
+    } finally {
+      setIsLoading(false)
     }
+  }
 
-    setUsers(storedUsers)
+  useEffect(() => {
+    fetchUsers()
   }, [])
 
-  // Lọc người dùng theo từ khóa tìm kiếm
+  // Filtered users based on search term
   const filteredUsers = users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -146,22 +117,32 @@ const UserManagement = () => {
   }
 
   const handleEditUser = (user) => {
-    setUserData({
-      ...user,
+    setSelectedUser(user)
+    setEditFormData({
+      name: user.name || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      role: user.role || "user",
+      status: user.status || "active",
     })
-    setEditingUser(user.id)
-    setShowForm(true)
   }
 
-  const handleDeleteUser = (userId) => {
+  const handleDeleteUser = async (userId) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa người dùng này?")) {
-      const updatedUsers = users.filter((user) => user.id !== userId)
-      setUsers(updatedUsers)
-      localStorage.setItem("users", JSON.stringify(updatedUsers))
+      try {
+        await userAPI.deleteUser(userId)
+        // Refresh user list
+        fetchUsers(pagination.currentPage)
 
-      // Nếu đang xem chi tiết người dùng bị xóa, đóng modal
-      if (selectedUser && selectedUser.id === userId) {
-        setSelectedUser(null)
+        // If viewing deleted user details, close modal
+        if (selectedUser && selectedUser._id === userId) {
+          setSelectedUser(null)
+        }
+
+        alert("Xóa người dùng thành công!")
+      } catch (err) {
+        console.error("Error deleting user:", err)
+        alert("Không thể xóa người dùng. Vui lòng thử lại sau.")
       }
     }
   }
@@ -174,48 +155,55 @@ const UserManagement = () => {
     })
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-
-    if (editingUser) {
-      // Cập nhật người dùng đã tồn tại
-      const updatedUsers = users.map((user) => {
-        if (user.id === editingUser) {
-          return {
-            ...userData,
-            id: editingUser,
-          }
-        }
-        return user
-      })
-      setUsers(updatedUsers)
-      localStorage.setItem("users", JSON.stringify(updatedUsers))
-      alert("Cập nhật thông tin người dùng thành công!")
-    } else {
-      // Thêm người dùng mới
-      const newUser = {
-        ...userData,
-        id: Date.now(),
-        registeredAt: new Date().toISOString(),
-      }
-
-      const updatedUsers = [...users, newUser]
-      setUsers(updatedUsers)
-      localStorage.setItem("users", JSON.stringify(updatedUsers))
-      alert("Thêm người dùng mới thành công!")
-    }
-
-    setShowForm(false)
-    setEditingUser(null)
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setEditFormData({
+      ...editFormData,
+      [name]: value,
+    })
   }
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
+  const handleSaveUser = async (e) => {
+    e.preventDefault()
+    if (!selectedUser) return
+
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const payload = {
+        name,
+        email,
+        phone,
+        role: selectedRole,
+        status: selectedStatus,
+        isBlocked,
+      }
+
+      Object.keys(payload).forEach(key => (payload[key] == null || payload[key] === '') && delete payload[key]);
+
+      console.log("Updating user with ID:", selectedUser._id);
+      console.log("Payload being sent:", payload);
+
+      await userAPI.updateUser(selectedUser._id, payload)
+
+      alert("Cập nhật người dùng thành công!")
+      handleCloseDetail()
+      fetchUsers(pagination.currentPage)
+    } catch (err) {
+      console.error("Error saving user:", err)
+      if (err.response && err.response.data && err.response.data.message) {
+          setError(`Lỗi cập nhật: ${err.response.data.message}`);
+      } else {
+          setError("Không thể cập nhật người dùng. Vui lòng thử lại sau.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const handlePageChange = (page) => {
+    fetchUsers(page)
   }
 
   const getRoleBadgeClass = (role) => {
@@ -264,7 +252,7 @@ const UserManagement = () => {
                 <FaTimes />
               </button>
             </div>
-            <form className="add-user-form" onSubmit={handleSubmit}>
+            <form className="add-user-form" onSubmit={handleSaveUser}>
               <div className="form-group">
                 <label htmlFor="name">Họ và tên</label>
                 <input
@@ -357,122 +345,153 @@ const UserManagement = () => {
           </div>
         ) : (
           <div className="users-list-container">
-            {filteredUsers.length === 0 ? (
+            {isLoading ? (
+              <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>Đang tải dữ liệu...</p>
+              </div>
+            ) : error ? (
+              <div className="error-message">
+                <p>{error}</p>
+                <Button variant="primary" onClick={() => fetchUsers()}>
+                  Thử lại
+                </Button>
+              </div>
+            ) : filteredUsers.length === 0 ? (
               <div className="no-users">
                 <p>Không tìm thấy người dùng nào phù hợp với từ khóa tìm kiếm.</p>
               </div>
             ) : (
-              <table className="users-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Họ và tên</th>
-                    <th>Email</th>
-                    <th>Số điện thoại</th>
-                    <th>Vai trò</th>
-                    <th>Trạng thái</th>
-                    <th>Ngày đăng ký</th>
-                    <th>Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td>#{user.id.toString().slice(-4)}</td>
-                      <td>{user.name}</td>
-                      <td>{user.email}</td>
-                      <td>{user.phone}</td>
-                      <td>
-                        <span className={`role-badge ${getRoleBadgeClass(user.role)}`}>
-                          {user.role === "admin" ? "Quản trị viên" : user.role === "manager" ? "Quản lý" : "Người dùng"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`status-badge ${getStatusBadgeClass(user.status)}`}>
-                          {user.status === "active" ? "Hoạt động" : "Không hoạt động"}
-                        </span>
-                      </td>
-                      <td>{formatDate(user.registeredAt)}</td>
-                      <td className="action-buttons">
-                        <button className="view-button" onClick={() => handleViewUser(user)} title="Xem chi tiết">
-                          <FaEye />
-                        </button>
-                        <button className="edit-button" onClick={() => handleEditUser(user)} title="Chỉnh sửa">
-                          <FaEdit />
-                        </button>
-                        <button className="delete-button" onClick={() => handleDeleteUser(user.id)} title="Xóa">
-                          <FaTrash />
-                        </button>
-                      </td>
+              <>
+                <table className="users-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Họ và tên</th>
+                      <th>Email</th>
+                      <th>Số điện thoại</th>
+                      <th>Vai trò</th>
+                      <th>Trạng thái</th>
+                      <th>Ngày đăng ký</th>
+                      <th>Thao tác</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr key={user._id}>
+                        <td>#{user._id.slice(-4)}</td>
+                        <td>{user.name}</td>
+                        <td>{user.email}</td>
+                        <td>{user.phone}</td>
+                        <td>
+                          <span className={`role-badge ${getRoleBadgeClass(user.role)}`}>
+                            {user.role === "admin"
+                              ? "Quản trị viên"
+                              : user.role === "manager"
+                                ? "Quản lý"
+                                : "Người dùng"}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-badge ${getStatusBadgeClass(user.status)}`}>
+                            {user.status === "active" ? "Hoạt động" : "Không hoạt động"}
+                          </span>
+                        </td>
+                        <td>{formatDate(user.createdAt)}</td>
+                        <td className="action-buttons">
+                          <button className="view-button" onClick={() => handleViewUser(user)} title="Xem chi tiết">
+                            <FaEye />
+                          </button>
+                          <button className="edit-button" onClick={() => handleEditUser(user)} title="Chỉnh sửa">
+                            <FaEdit />
+                          </button>
+                          <button className="delete-button" onClick={() => handleDeleteUser(user._id)} title="Xóa">
+                            <FaTrash />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {pagination.totalPages > 1 && (
+                  <div className="pagination">
+                    <button
+                      className="pagination-button"
+                      disabled={pagination.currentPage === 1}
+                      onClick={() => handlePageChange(pagination.currentPage - 1)}
+                    >
+                      &laquo; Trước
+                    </button>
+
+                    {[...Array(pagination.totalPages)].map((_, index) => (
+                      <button
+                        key={index}
+                        className={`pagination-button ${pagination.currentPage === index + 1 ? "active" : ""}`}
+                        onClick={() => handlePageChange(index + 1)}
+                      >
+                        {index + 1}
+                      </button>
+                    ))}
+
+                    <button
+                      className="pagination-button"
+                      disabled={pagination.currentPage === pagination.totalPages}
+                      onClick={() => handlePageChange(pagination.currentPage + 1)}
+                    >
+                      Sau &raquo;
+                    </button>
+                  </div>
+                )}
+
+                {selectedUser && (
+                  <div className="user-detail-modal">
+                    <div className="modal-content">
+                      <span className="close" onClick={handleCloseDetail}>
+                        &times;
+                      </span>
+                      <h2>Chỉnh sửa người dùng</h2>
+                      <form onSubmit={handleSaveUser} className="add-user-form">
+                        <div className="form-group">
+                          <label htmlFor="editName">Tên:</label>
+                          <input type="text" id="editName" name="name" value={editFormData.name} onChange={handleInputChange} required />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="editEmail">Email:</label>
+                          <input type="email" id="editEmail" name="email" value={editFormData.email} onChange={handleInputChange} required />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="editPhone">Số điện thoại:</label>
+                          <input type="tel" id="editPhone" name="phone" value={editFormData.phone} onChange={handleInputChange} required />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="editRole">Vai trò:</label>
+                          <select id="editRole" name="role" value={editFormData.role} onChange={handleInputChange}>
+                            <option value="user">Người dùng</option>
+                            <option value="manager">Quản lý</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="editStatus">Trạng thái:</label>
+                          <select id="editStatus" name="status" value={editFormData.status} onChange={handleInputChange}>
+                            <option value="active">Hoạt động</option>
+                            <option value="inactive">Khóa</option>
+                          </select>
+                        </div>
+                        {error && <div className="error-message">{error}</div>}
+                        <div className="modal-actions">
+                          <Button variant="secondary" onClick={handleCloseDetail}>Hủy</Button>
+                          <Button type="submit" variant="primary" disabled={isLoading}>
+                            {isLoading ? 'Đang lưu...' : 'Lưu'}
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
-          </div>
-        )}
-
-        {selectedUser && (
-          <div className="user-detail-modal">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h3>Chi tiết người dùng</h3>
-                <button className="close-button" onClick={handleCloseDetail}>
-                  ×
-                </button>
-              </div>
-
-              <div className="user-detail">
-                <div className="user-avatar">
-                  <div className="avatar-placeholder">{selectedUser.name.charAt(0)}</div>
-                </div>
-
-                <div className="user-info">
-                  <h4>{selectedUser.name}</h4>
-                  <p className="user-id">ID: #{selectedUser.id.toString().slice(-4)}</p>
-                  <p className="user-email">
-                    <strong>Email:</strong> {selectedUser.email}
-                  </p>
-                  <p className="user-phone">
-                    <strong>Số điện thoại:</strong> {selectedUser.phone}
-                  </p>
-                  <p className="user-address">
-                    <strong>Địa chỉ:</strong> {selectedUser.address}
-                  </p>
-                  <p className="user-role">
-                    <strong>Vai trò:</strong>{" "}
-                    <span className={`role-badge ${getRoleBadgeClass(selectedUser.role)}`}>
-                      {selectedUser.role === "admin"
-                        ? "Quản trị viên"
-                        : selectedUser.role === "manager"
-                          ? "Quản lý"
-                          : "Người dùng"}
-                    </span>
-                  </p>
-                  <p className="user-status">
-                    <strong>Trạng thái:</strong>{" "}
-                    <span className={`status-badge ${getStatusBadgeClass(selectedUser.status)}`}>
-                      {selectedUser.status === "active" ? "Hoạt động" : "Không hoạt động"}
-                    </span>
-                  </p>
-                  <p className="user-registered">
-                    <strong>Ngày đăng ký:</strong> {formatDate(selectedUser.registeredAt)}
-                  </p>
-                  <p className="user-bio">
-                    <strong>Giới thiệu:</strong> {selectedUser.bio || "Không có thông tin"}
-                  </p>
-                </div>
-
-                <div className="detail-actions">
-                  <Button variant="secondary" onClick={handleCloseDetail}>
-                    Đóng
-                  </Button>
-                  <Button variant="primary" onClick={() => handleEditUser(selectedUser)}>
-                    Chỉnh sửa
-                  </Button>
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>
@@ -481,4 +500,3 @@ const UserManagement = () => {
 }
 
 export default memo(UserManagement)
-

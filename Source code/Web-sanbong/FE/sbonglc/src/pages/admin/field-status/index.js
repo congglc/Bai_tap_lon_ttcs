@@ -7,6 +7,8 @@ import DatePicker from "react-datepicker"
 import "react-datepicker/dist/react-datepicker.css"
 import { FaEdit, FaCheck, FaTimes } from "react-icons/fa"
 import { formater } from "utils/formater"
+import { fieldAPI, fieldStatusAPI } from "../../../services/api"
+import { formatDateForAPI } from "../../../utils/formatDate"
 
 const Button = ({ children, variant = "primary", type = "button", onClick, disabled = false }) => {
   return (
@@ -26,6 +28,7 @@ const FieldStatus = () => {
   const [fields, setFields] = useState([])
   const [editingSlot, setEditingSlot] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   // Khung giờ mặc định
   const defaultTimeSlots = [
@@ -39,97 +42,64 @@ const FieldStatus = () => {
     "21h30-23h",
   ]
 
-  // Lấy dữ liệu sân bóng từ localStorage và tạo dữ liệu trạng thái sân
-  useEffect(() => {
-    setIsLoading(true)
+  // Fetch fields and their status
+  const fetchFieldsAndStatus = async (date) => {
+    try {
+      setIsLoading(true)
+      setError(null)
 
-    // Lấy danh sách sân từ localStorage
-    const storedFields = JSON.parse(localStorage.getItem("fields") || "[]")
+      // Fetch all fields
+      const fieldsResponse = await fieldAPI.getFields()
+      const allFields = fieldsResponse.data.data.fields
 
-    // Tạo dữ liệu mẫu cho các sân mặc định
-    const defaultFields = [
-      {
-        id: 1,
-        name: "Sân số 1",
-        type: "5v5",
-      },
-      {
-        id: 2,
-        name: "Sân số 2",
-        type: "7v7",
-      },
-      {
-        id: 3,
-        name: "Sân số 3",
-        type: "5v5",
-      },
-    ]
+      // Fetch field status for the selected date
+      const formattedDate = formatDateForAPI(date)
+      const statusResponse = await fieldStatusAPI.getFieldStatusByDate(formattedDate)
+      const fieldStatuses = statusResponse.data.data.fieldStatus || []
 
-    // Kết hợp sân mặc định với sân từ localStorage
-    let combinedFields = [...defaultFields]
+      // Combine field data with status data
+      const fieldsWithStatus = allFields.map((field) => {
+        const fieldStatus = fieldStatuses.find((status) => status.fieldId === field._id)
 
-    // Thêm các sân từ localStorage mà không trùng ID với sân mặc định
-    storedFields.forEach((field) => {
-      if (!combinedFields.some((f) => f.id === field.id)) {
-        combinedFields.push({
-          id: field.id,
-          name: field.name || field.title,
-          type: field.type || "7v7",
-        })
-      }
-    })
-
-    // Lấy dữ liệu trạng thái sân từ localStorage hoặc tạo mới nếu chưa có
-    const dateKey = formatDateKey(selectedDate)
-    const storedStatus = JSON.parse(localStorage.getItem(`fieldStatus_${dateKey}`) || "null")
-
-    if (storedStatus) {
-      // Cập nhật dữ liệu sân với trạng thái đã lưu
-      combinedFields = combinedFields.map((field) => {
-        const fieldStatus = storedStatus.find((s) => s.fieldId === field.id)
         if (fieldStatus) {
           return {
             ...field,
             timeSlots: fieldStatus.timeSlots,
           }
         } else {
-          // Nếu không có dữ liệu trạng thái cho sân này, tạo mới
+          // If no status found, create default time slots
           return {
             ...field,
-            timeSlots: generateDefaultTimeSlots(field.id),
+            timeSlots: generateDefaultTimeSlots(field._id),
           }
         }
       })
-    } else {
-      // Tạo dữ liệu trạng thái mặc định cho tất cả các sân
-      combinedFields = combinedFields.map((field) => ({
-        ...field,
-        timeSlots: generateDefaultTimeSlots(field.id),
-      }))
+
+      setFields(fieldsWithStatus)
+    } catch (err) {
+      console.error("Error fetching fields and status:", err)
+      setError("Không thể tải dữ liệu sân bóng. Vui lòng thử lại sau.")
+    } finally {
+      setIsLoading(false)
     }
-
-    setFields(combinedFields)
-    setIsLoading(false)
-  }, [selectedDate])
-
-  // Tạo khóa ngày để lưu vào localStorage
-  const formatDateKey = (date) => {
-    return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
   }
+
+  useEffect(() => {
+    fetchFieldsAndStatus(selectedDate)
+  }, [selectedDate])
 
   // Tạo dữ liệu trạng thái mặc định cho các khung giờ
   const generateDefaultTimeSlots = (fieldId) => {
     return defaultTimeSlots.map((time, index) => {
-      // Tạo trạng thái ngẫu nhiên cho dữ liệu mẫu
-      const randomStatus = Math.random() > 0.6 ? "available" : Math.random() > 0.5 ? "booked" : "available"
+      // Tạo trạng thái mặc định là available
       const basePrice = time.includes("17h") || time.includes("18h") ? 500000 : 300000
 
       return {
-        id: fieldId * 100 + index,
+        id: `${fieldId}_${index}`,
         time,
-        status: randomStatus,
+        status: "available",
         price: basePrice,
-        bookedBy: randomStatus === "booked" ? `Đội FC ${Math.floor(Math.random() * 10) + 1}` : "",
+        bookedBy: "",
         note: "",
       }
     })
@@ -140,74 +110,74 @@ const FieldStatus = () => {
   }
 
   const handleEditSlot = (fieldId, slotId) => {
-    const field = fields.find((f) => f.id === fieldId)
-    const slot = field.timeSlots.find((s) => s.id === slotId)
+    const field = fields.find((f) => f._id === fieldId)
+    const slot = field.timeSlots.find((s) => s._id === slotId || s.id === slotId)
     setEditingSlot({ ...slot, fieldId })
   }
 
-  const handleUpdateSlot = () => {
+  const handleUpdateSlot = async () => {
     if (!editingSlot) return
 
-    const updatedFields = fields.map((field) => {
-      if (field.id === editingSlot.fieldId) {
-        return {
-          ...field,
-          timeSlots: field.timeSlots.map((slot) => (slot.id === editingSlot.id ? { ...slot, ...editingSlot } : slot)),
-        }
-      }
-      return field
-    })
+    try {
+      const formattedDate = formatDateForAPI(selectedDate)
 
-    setFields(updatedFields)
+      // Update the time slot status
+      const updateSlotId = editingSlot._id || editingSlot.id; // Use _id if available, otherwise id
 
-    // Lưu trạng thái sân vào localStorage
-    saveFieldStatus(updatedFields)
+      const payload = {
+        status: editingSlot.status,
+        bookedBy: editingSlot.status === 'booked' ? editingSlot.bookedBy : null,
+        note: editingSlot.status === 'maintenance' ? editingSlot.note : null,
+        price: editingSlot.price,
+      };
 
-    setEditingSlot(null)
+      console.log("Payload sent:", payload);
+
+      await fieldStatusAPI.updateTimeSlotStatus(editingSlot.fieldId, formattedDate, updateSlotId, payload)
+
+      // Refresh field status data
+      fetchFieldsAndStatus(selectedDate)
+      setEditingSlot(null)
+
+      alert("Cập nhật trạng thái sân thành công!")
+    } catch (err) {
+      console.error("Error updating time slot:", err)
+      alert("Không thể cập nhật trạng thái sân. Vui lòng thử lại sau.")
+    }
   }
 
   const handleCancelEdit = () => {
     setEditingSlot(null)
   }
 
-  const handleChangeSlotStatus = (fieldId, slotId, newStatus) => {
-    const updatedFields = fields.map((field) => {
-      if (field.id === fieldId) {
-        return {
-          ...field,
-          timeSlots: field.timeSlots.map((slot) => {
-            if (slot.id === slotId) {
-              return {
-                ...slot,
-                status: newStatus,
-                // Nếu trạng thái là bảo trì, thêm ghi chú mặc định
-                note: newStatus === "maintenance" ? "Bảo trì sân" : slot.note,
-              }
-            }
-            return slot
-          }),
-        }
+  const handleChangeSlotStatus = async (fieldId, slotId, newStatus) => {
+    try {
+      const formattedDate = formatDateForAPI(selectedDate)
+
+      // Find the actual slot object to get its _id or id
+      const field = fields.find(f => f._id === fieldId);
+      const slot = field?.timeSlots.find(s => s._id === slotId || s.id === slotId);
+
+      if (!slot) {
+        throw new Error("Không tìm thấy khung giờ để cập nhật.");
       }
-      return field
-    })
 
-    setFields(updatedFields)
+      const updateSlotId = slot._id || slot.id; // Use _id if available, otherwise id
 
-    // Lưu trạng thái sân vào localStorage
-    saveFieldStatus(updatedFields)
-  }
+      // Update the time slot status
+      await fieldStatusAPI.updateTimeSlotStatus(fieldId, formattedDate, updateSlotId, {
+        status: newStatus,
+        note: newStatus === "maintenance" ? "Bảo trì sân" : "",
+      })
 
-  // Lưu trạng thái sân vào localStorage
-  const saveFieldStatus = (updatedFields) => {
-    const dateKey = formatDateKey(selectedDate)
+      // Refresh field status data
+      fetchFieldsAndStatus(selectedDate)
 
-    // Chuyển đổi dữ liệu để lưu trữ
-    const statusData = updatedFields.map((field) => ({
-      fieldId: field.id,
-      timeSlots: field.timeSlots,
-    }))
-
-    localStorage.setItem(`fieldStatus_${dateKey}`, JSON.stringify(statusData))
+      alert("Cập nhật trạng thái sân thành công!")
+    } catch (err) {
+      console.error("Error changing slot status:", err)
+      alert("Không thể cập nhật trạng thái sân. Vui lòng thử lại sau.")
+    }
   }
 
   const getStatusClass = (status) => {
@@ -258,10 +228,17 @@ const FieldStatus = () => {
             <div className="loading-spinner"></div>
             <p>Đang tải dữ liệu...</p>
           </div>
+        ) : error ? (
+          <div className="error-message">
+            <p>{error}</p>
+            <Button variant="primary" onClick={() => fetchFieldsAndStatus(selectedDate)}>
+              Thử lại
+            </Button>
+          </div>
         ) : (
           <div className="field-status-container">
             {fields.map((field) => (
-              <div key={field.id} className="field-card">
+              <div key={field._id} className="field-card">
                 <div className="field-header">
                   <h2>{field.name}</h2>
                   <span className="field-type">Loại: {field.type}</span>
@@ -293,13 +270,13 @@ const FieldStatus = () => {
                             {slot.status === "maintenance" && slot.note}
                           </td>
                           <td className="action-buttons">
-                            <button className="edit-button" onClick={() => handleEditSlot(field.id, slot.id)}>
+                            <button className="edit-button" onClick={() => handleEditSlot(field._id, slot.id)}>
                               <FaEdit />
                             </button>
                             {slot.status !== "available" && (
                               <button
                                 className="available-button"
-                                onClick={() => handleChangeSlotStatus(field.id, slot.id, "available")}
+                                onClick={() => handleChangeSlotStatus(field._id, slot.id, "available")}
                                 title="Đánh dấu là còn trống"
                               >
                                 <FaCheck />
@@ -308,7 +285,7 @@ const FieldStatus = () => {
                             {slot.status !== "maintenance" && (
                               <button
                                 className="maintenance-button"
-                                onClick={() => handleChangeSlotStatus(field.id, slot.id, "maintenance")}
+                                onClick={() => handleChangeSlotStatus(field._id, slot.id, "maintenance")}
                                 title="Đánh dấu là bảo trì"
                               >
                                 <FaTimes />
@@ -395,4 +372,3 @@ const FieldStatus = () => {
 }
 
 export default memo(FieldStatus)
-

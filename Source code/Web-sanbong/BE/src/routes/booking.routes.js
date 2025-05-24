@@ -15,6 +15,19 @@ const router = express.Router()
 router.get("/", authenticate, authorize(constants.roles.ADMIN, constants.roles.MANAGER), bookingController.getBookings)
 
 /**
+ * @route GET /api/bookings/search
+ * @desc Get bookings by email or phone
+ * @access Private (Admin/Manager)
+ */
+router.get(
+  "/search",
+  authenticate,
+  authorize(constants.roles.ADMIN, constants.roles.MANAGER),
+  validate(bookingValidation.getBookingsByEmailOrPhone),
+  bookingController.getBookingsByEmailOrPhone,
+)
+
+/**
  * @route GET /api/bookings/:bookingId
  * @desc Get booking by ID
  * @access Private
