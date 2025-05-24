@@ -5,9 +5,14 @@ import "./style.scss"
 import { useNavigate } from "react-router-dom"
 import AdminSidebar from "../components/Sidebar"
 import { FaEdit, FaTrash, FaPlus, FaTimes } from "react-icons/fa"
-import san_1 from "../../../assets/user/order/image.jpg"
-import san_2 from "../../../assets/user/order/image (2).png"
-import san_3 from "../../../assets/user/order/image (1).png"
+import { fieldAPI, uploadAPI } from "../../../services/api"
+
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081/api"
+const getImageUrl = (src) => {
+  if (!src) return "/placeholder.svg"
+  if (src.startsWith("http")) return src
+  return API_URL.replace("/api", "") + src
+}
 
 const Button = ({ children, variant = "primary", type = "button", onClick, disabled = false }) => {
   return (
@@ -27,6 +32,8 @@ const AddField = () => {
   const [fields, setFields] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [editingField, setEditingField] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [fieldData, setFieldData] = useState({
     name: "",
     location: "",
@@ -35,87 +42,64 @@ const AddField = () => {
     type: "7v7",
     image: null,
     imagePreview: null,
+    time: "8:00-23:00",
+    price: 400000,
+    title: "",
   })
 
-  // Mẫu dữ liệu sân bóng mặc định
-  const defaultFields = [
-    {
-      id: 1,
-      name: "Sân số 1",
-      location: "Khu đô thị Nguyễn Trãi Hà Đông",
-      manager: "0123456789",
-      description: "Sân cỏ nhân tạo chất lượng cao, có đèn chiếu sáng",
-      type: "5v5",
-      src: san_1,
-      alt: "Sân 1",
-      title: "Sân số 1",
-      time: "90 phút",
-      price: 300000,
-    },
-    {
-      id: 2,
-      name: "Sân số 2",
-      location: "Khu đô thị Nguyễn Trãi Hà Đông",
-      manager: "0123456789",
-      description: "Sân cỏ nhân tạo phù hợp cho đội 7 người, có hệ thống chiếu sáng tốt",
-      type: "7v7",
-      src: san_2,
-      alt: "Sân 2",
-      title: "Sân số 2",
-      time: "90 phút",
-      price: 400000,
-    },
-    {
-      id: 3,
-      name: "Sân số 3",
-      location: "Khu đô thị Nguyễn Trãi Hà Đông",
-      manager: "0123456789",
-      description: "Sân cỏ nhân tạo cao cấp, phù hợp cho các trận đấu chính thức",
-      type: "11v11",
-      src: san_3,
-      alt: "Sân 3",
-      title: "Sân số 3",
-      time: "Trận đấu",
-      price: 500000,
-    },
-  ]
+  // Fetch fields from API
+  const fetchFields = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await fieldAPI.getFields()
+      setFields(response.data.data.fields)
+    } catch (err) {
+      console.error("Error fetching fields:", err)
+      setError("Không thể tải danh sách sân bóng. Vui lòng thử lại sau.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-  // Lấy danh sách sân bóng từ localStorage khi component được mount
   useEffect(() => {
-    const storedFields = JSON.parse(localStorage.getItem("fields") || "[]")
-
-    // Kết hợp sân mặc định với sân từ localStorage
-    const combinedFields = [...defaultFields]
-
-    // Thêm các sân từ localStorage mà không trùng ID với sân mặc định
-    storedFields.forEach((field) => {
-      if (!combinedFields.some((f) => f.id === field.id)) {
-        combinedFields.push(field)
-      }
-    })
-
-    setFields(combinedFields)
-
-    // Lưu lại danh sách kết hợp vào localStorage
-    localStorage.setItem("fields", JSON.stringify(combinedFields))
+    fetchFields()
   }, [])
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFieldData({
+    let newData = {
       ...fieldData,
       [name]: value,
-    })
+    }
+    if (name === "type") {
+      newData.price = value === "5v5" ? 300000 : value === "7v7" ? 400000 : 500000
+    }
+    setFieldData(newData)
   }
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files[0]
     if (file) {
+      // Upload ngay khi chọn ảnh
+      const formData = new FormData()
+      formData.append("image", file)
+      try {
+        const uploadResponse = await uploadAPI.uploadFile(formData)
+        const backendUrl = uploadResponse.data.data.url
+        setFieldData({
+          ...fieldData,
+          image: null, // đã upload xong, không cần giữ file local nữa
+          imagePreview: backendUrl,
+        })
+      } catch (err) {
+        alert("Upload ảnh thất bại!")
       setFieldData({
         ...fieldData,
-        image: file,
-        imagePreview: URL.createObjectURL(file),
+          image: null,
+          imagePreview: null,
       })
+      }
     }
   }
 
@@ -128,6 +112,9 @@ const AddField = () => {
       type: "7v7",
       image: null,
       imagePreview: null,
+      time: "8:00-23:00",
+      price: 400000,
+      title: "",
     })
     setEditingField(null)
   }
@@ -142,76 +129,92 @@ const AddField = () => {
     resetForm()
   }
 
-  const handleEditField = (field) => {
-    setFieldData({
-      name: field.name,
-      location: field.location,
-      manager: field.manager,
-      description: field.description || "",
-      type: field.type || "7v7",
-      image: null,
-      imagePreview: field.src,
-    })
-    setEditingField(field.id)
-    setShowForm(true)
-  }
+  const handleEditField = async (fieldId) => {
+    try {
+      setIsLoading(true)
+      const response = await fieldAPI.getFieldById(fieldId)
+      const field = response.data.data.field
 
-  const handleDeleteField = (fieldId) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa sân bóng này?")) {
-      const updatedFields = fields.filter((field) => field.id !== fieldId)
-      setFields(updatedFields)
-      localStorage.setItem("fields", JSON.stringify(updatedFields))
+      setFieldData({
+        name: field.name,
+        location: field.location,
+        manager: field.manager,
+        description: field.description || "",
+        type: field.type || "7v7",
+        image: null,
+        imagePreview: field.src || field.imageUrl,
+        time: field.time || "8:00-23:00",
+        price: field.price || 400000,
+        title: field.title || "",
+      })
+      setEditingField(fieldId)
+      setShowForm(true)
+    } catch (err) {
+      console.error("Error fetching field details:", err)
+      alert("Không thể tải thông tin sân bóng. Vui lòng thử lại sau.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleDeleteField = async (fieldId) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa sân bóng này?")) {
+      try {
+        await fieldAPI.deleteField(fieldId)
+        // Refresh field list
+        fetchFields()
+        alert("Xóa sân bóng thành công!")
+      } catch (err) {
+        console.error("Error deleting field:", err)
+        alert("Không thể xóa sân bóng. Vui lòng thử lại sau.")
+      }
+    }
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (editingField) {
-      // Cập nhật sân bóng ��ã tồn tại
-      const updatedFields = fields.map((field) => {
-        if (field.id === editingField) {
-          return {
-            ...field,
-            name: fieldData.name,
-            location: fieldData.location,
-            manager: fieldData.manager,
-            description: fieldData.description,
-            type: fieldData.type,
-            src: fieldData.imagePreview || field.src,
-            alt: fieldData.name,
-            title: fieldData.name,
-          }
-        }
-        return field
-      })
-      setFields(updatedFields)
-      localStorage.setItem("fields", JSON.stringify(updatedFields))
-      alert("Cập nhật sân bóng thành công!")
-    } else {
-      // Thêm sân bóng mới
-      const newField = {
-        id: Date.now(),
-        name: fieldData.name,
+    try {
+      // Khi submit, chỉ cho phép nếu imagePreview là link backend
+      let src = null;
+      if (fieldData.imagePreview && typeof fieldData.imagePreview === 'string' && !fieldData.imagePreview.startsWith('blob:')) {
+        src = fieldData.imagePreview
+      }
+      if (!src) {
+        alert("Bạn phải upload hình ảnh sân bóng!")
+        return
+      }
+
+      const name = fieldData.name
+      const fieldPayload = {
+        name: name,
         location: fieldData.location,
         manager: fieldData.manager,
         description: fieldData.description,
         type: fieldData.type,
-        src: fieldData.imagePreview || "/placeholder.svg?height=200&width=300",
-        alt: fieldData.name,
-        title: fieldData.name,
-        time: "90 phút",
-        price: fieldData.type === "5v5" ? 300000 : fieldData.type === "7v7" ? 400000 : 500000,
+        src: src,
+        alt: `${name} image`,
+        title: fieldData.title || `${name} - Professional Football Venue`,
+        time: "8:00-23:00",
+        price: Number(fieldData.price),
       }
 
-      const updatedFields = [...fields, newField]
-      setFields(updatedFields)
-      localStorage.setItem("fields", JSON.stringify(updatedFields))
-      alert("Thêm sân bóng thành công!")
-    }
+      if (editingField) {
+        await fieldAPI.updateField(editingField, fieldPayload)
+        alert("Cập nhật sân bóng thành công!")
+      } else {
+        await fieldAPI.createField(fieldPayload)
+        alert("Thêm sân bóng thành công!")
+      }
 
-    setShowForm(false)
-    resetForm()
+      // Refresh field list
+      fetchFields()
+      setShowForm(false)
+      resetForm()
+    } catch (err) {
+      console.error("Error saving field:", err)
+      alert("Không thể lưu thông tin sân bóng. Vui lòng thử lại sau.")
+    }
   }
 
   return (
@@ -311,6 +314,37 @@ const AddField = () => {
                 )}
               </div>
 
+              <div className="form-group">
+                <label>Khung giờ hoạt động</label>
+                <div style={{ padding: '8px 0', fontWeight: 500 }}>8:00-23:00</div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="price">Giá mặc định (VNĐ/ca)</label>
+                <input
+                  type="number"
+                  id="price"
+                  name="price"
+                  value={fieldData.price}
+                  onChange={handleChange}
+                  placeholder="Nhập giá mặc định"
+                  required
+                  min={0}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="title">Tiêu đề (title)</label>
+                <input
+                  type="text"
+                  id="title"
+                  name="title"
+                  value={fieldData.title}
+                  onChange={handleChange}
+                  placeholder="Nhập tiêu đề cho sân bóng (nếu để trống sẽ tự sinh)"
+                />
+              </div>
+
               <div className="form-actions">
                 <Button type="button" variant="secondary" onClick={handleCloseForm}>
                   Hủy
@@ -323,16 +357,28 @@ const AddField = () => {
           </div>
         ) : (
           <div className="fields-list-container">
-            {fields.length === 0 ? (
+            {isLoading ? (
+              <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>Đang tải dữ liệu...</p>
+              </div>
+            ) : error ? (
+              <div className="error-message">
+                <p>{error}</p>
+                <Button variant="primary" onClick={fetchFields}>
+                  Thử lại
+                </Button>
+              </div>
+            ) : fields.length === 0 ? (
               <div className="no-fields">
                 <p>Chưa có sân bóng nào. Hãy thêm sân bóng mới!</p>
               </div>
             ) : (
               <div className="fields-grid">
                 {fields.map((field) => (
-                  <div className="field-card" key={field.id}>
+                  <div className="field-card" key={field._id}>
                     <div className="field-image">
-                      <img src={field.src || "/placeholder.svg"} alt={field.alt} />
+                      <img src={getImageUrl(field.src) || getImageUrl(field.imageUrl)} alt={field.name} />
                     </div>
                     <div className="field-content">
                       <h3>{field.name}</h3>
@@ -342,10 +388,10 @@ const AddField = () => {
                       {field.description && <p className="field-description">{field.description}</p>}
                     </div>
                     <div className="field-actions">
-                      <button className="edit-button" onClick={() => handleEditField(field)}>
+                      <button className="edit-button" onClick={() => handleEditField(field._id)}>
                         <FaEdit />
                       </button>
-                      <button className="delete-button" onClick={() => handleDeleteField(field.id)}>
+                      <button className="delete-button" onClick={() => handleDeleteField(field._id)}>
                         <FaTrash />
                       </button>
                     </div>
@@ -361,4 +407,3 @@ const AddField = () => {
 }
 
 export default memo(AddField)
-

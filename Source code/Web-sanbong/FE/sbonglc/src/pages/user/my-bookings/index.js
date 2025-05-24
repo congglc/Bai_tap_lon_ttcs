@@ -5,78 +5,77 @@ import "./style.scss"
 import { useNavigate } from "react-router-dom"
 import { MdOutlineDisabledByDefault } from "react-icons/md"
 import { formater } from "utils/formater"
+import { bookingAPI } from "../../../services/api"
+import { formatDate, formatDateTime } from "../../../utils/formatDate"
 
 const MyBookings = () => {
   const navigate = useNavigate()
   const [bookings, setBookings] = useState([])
   const [userInfo, setUserInfo] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [selectedBooking, setSelectedBooking] = useState(null)
 
   useEffect(() => {
     window.scrollTo(0, 0)
 
-    // Kiểm tra đăng nhập
+    // Check if user is logged in
     const storedUserInfo = localStorage.getItem("userInfo")
     if (!storedUserInfo) {
       navigate("/dang-nhap")
       return
     }
 
-    setUserInfo(JSON.parse(storedUserInfo))
+    const userInfoObj = JSON.parse(storedUserInfo)
+    setUserInfo(userInfoObj)
 
-    // Lấy danh sách đơn đặt sân từ localStorage
-    setIsLoading(true)
-    const allBookings = JSON.parse(localStorage.getItem("bookings") || "[]")
-
-    // Lọc đơn đặt sân của người dùng hiện tại (dựa vào số điện thoại)
-    const userPhone = JSON.parse(storedUserInfo).phone
-    const userBookings = allBookings.filter((booking) => booking.contact === userPhone)
-
-    // Sắp xếp theo thời gian tạo, mới nhất lên đầu
-    userBookings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-
-    setBookings(userBookings)
-    setIsLoading(false)
+    // Fetch user's bookings
+    fetchUserBookings(userInfoObj)
   }, [navigate])
 
-  const handleExitClick = () => {
-    navigate(-1) // Quay lại trang trước
+  // Fetch user's bookings by email or phone
+  const fetchUserBookings = async (user) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      // Use email or phone to find bookings
+      const response = await bookingAPI.getBookingsByEmailOrPhone(user.email, user.phone)
+
+      // Sort bookings by creation date, newest first
+      const sortedBookings = response.data.data.bookings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+      setBookings(sortedBookings)
+    } catch (err) {
+      console.error("Error fetching user bookings:", err)
+      setError("Không thể tải danh sách đơn đặt sân. Vui lòng thử lại sau.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleViewBooking = (booking) => {
-    setSelectedBooking(booking)
+  const handleExitClick = () => {
+    navigate(-1) // Go back to previous page
+  }
+
+  const handleViewBooking = async (bookingId) => {
+    try {
+      setIsLoading(true)
+      const response = await bookingAPI.getBookingById(bookingId)
+      setSelectedBooking(response.data.data.booking)
+    } catch (err) {
+      console.error("Error fetching booking details:", err)
+      alert("Không thể tải chi tiết đơn đặt sân. Vui lòng thử lại sau.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleCloseDetail = () => {
     setSelectedBooking(null)
   }
 
-  // Format ngày giờ
-  const formatDateTime = (dateString) => {
-    if (!dateString) return ""
-    const date = new Date(dateString)
-    return date.toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  // Format ngày
-  const formatDate = (dateString) => {
-    if (!dateString) return ""
-    const date = new Date(dateString)
-    return date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
-  }
-
-  // Lấy class CSS cho trạng thái
+  // Get CSS class for status
   const getStatusClass = (status) => {
     switch (status) {
       case "confirmed":
@@ -90,7 +89,7 @@ const MyBookings = () => {
     }
   }
 
-  // Lấy text cho trạng thái
+  // Get text for status
   const getStatusText = (status) => {
     switch (status) {
       case "confirmed":
@@ -113,10 +112,17 @@ const MyBookings = () => {
         </button>
       </div>
 
-      {isLoading ? (
+      {isLoading && !selectedBooking ? (
         <div className="loading-container">
           <div className="loading-spinner"></div>
           <p>Đang tải dữ liệu...</p>
+        </div>
+      ) : error ? (
+        <div className="error-message">
+          <p>{error}</p>
+          <button className="retry-button" onClick={() => fetchUserBookings(userInfo)}>
+            Thử lại
+          </button>
         </div>
       ) : (
         <div className="bookings-content">
@@ -130,7 +136,7 @@ const MyBookings = () => {
           ) : (
             <div className="bookings-list">
               {bookings.map((booking) => (
-                <div className="booking-card" key={booking.id}>
+                <div className="booking-card" key={booking._id}>
                   <div className="booking-header">
                     <h3>{booking.fieldName}</h3>
                     <span className={`status-badge ${getStatusClass(booking.status)}`}>
@@ -152,7 +158,7 @@ const MyBookings = () => {
                     </p>
                   </div>
                   <div className="booking-actions">
-                    <button className="view-details-button" onClick={() => handleViewBooking(booking)}>
+                    <button className="view-details-button" onClick={() => handleViewBooking(booking._id)}>
                       Xem chi tiết
                     </button>
                   </div>
@@ -167,7 +173,7 @@ const MyBookings = () => {
         <div className="booking-detail-modal">
           <div className="modal-content">
             <div className="modal-header">
-              <h3>Chi tiết đơn đặt sân #{selectedBooking.id.toString().slice(-4)}</h3>
+              <h3>Chi tiết đơn đặt sân #{selectedBooking._id.slice(-4)}</h3>
               <button className="close-button" onClick={handleCloseDetail}>
                 ×
               </button>
@@ -244,4 +250,3 @@ const MyBookings = () => {
 }
 
 export default memo(MyBookings)
-

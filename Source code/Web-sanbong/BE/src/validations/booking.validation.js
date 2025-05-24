@@ -1,50 +1,56 @@
 const Joi = require("joi")
 const { objectId } = require("./custom.validation")
 
-/**
- * Get booking by ID validation schema
- */
 const getBookingById = {
-  params: Joi.object().keys({
+params: Joi.object().keys({
     bookingId: Joi.string().custom(objectId).required(),
-  }),
+}),
 }
 
-/**
- * Get bookings by user validation schema
- */
 const getBookingsByUser = {
-  params: Joi.object().keys({
+params: Joi.object().keys({
     userId: Joi.string().custom(objectId).required(),
-  }),
+}),
+query: Joi.object().keys({
+    status: Joi.string().valid("pending", "confirmed", "cancelled"),
+    page: Joi.number().integer().min(1),
+    limit: Joi.number().integer().min(1).max(100),
+}),
 }
 
-/**
- * Create booking validation schema
- */
+const getBookingsByEmailOrPhone = {
+query: Joi.object()
+    .keys({
+    email: Joi.string().email(),
+    phone: Joi.string(),
+    status: Joi.string().valid("pending", "confirmed", "cancelled"),
+    page: Joi.number().integer().min(1),
+    limit: Joi.number().integer().min(1).max(100),
+    })
+    .min(1),
+}
+
 const createBooking = {
-  body: Joi.object().keys({
+body: Joi.object().keys({
     teamName: Joi.string().required(),
-    teamLeaderName: Joi.string().required(),
-    contact: Joi.string().required(),
+    teamLeaderName: Joi.string().allow("").required(),
+    contact: Joi.string().allow("").required(),
     fieldId: Joi.string().custom(objectId).required(),
     fieldName: Joi.string().required(),
     date: Joi.date().required(),
     time: Joi.string().required(),
     price: Joi.number().required(),
-    notes: Joi.string(),
+    notes: Joi.string().allow(""),
     userId: Joi.string().custom(objectId).required(),
-  }),
+}),
 }
 
-/**
- * Update booking validation schema
- */
 const updateBooking = {
-  params: Joi.object().keys({
+params: Joi.object().keys({
     bookingId: Joi.string().custom(objectId).required(),
-  }),
-  body: Joi.object().keys({
+}),
+body: Joi.object()
+    .keys({
     teamName: Joi.string(),
     teamLeaderName: Joi.string(),
     contact: Joi.string(),
@@ -55,45 +61,38 @@ const updateBooking = {
     price: Joi.number(),
     notes: Joi.string(),
     status: Joi.string().valid("pending", "confirmed", "cancelled"),
-  }),
+    })
+    .min(1),
 }
 
-/**
- * Confirm booking validation schema
- */
 const confirmBooking = {
-  params: Joi.object().keys({
+params: Joi.object().keys({
     bookingId: Joi.string().custom(objectId).required(),
-  }),
+}),
 }
 
-/**
- * Cancel booking validation schema
- */
 const cancelBooking = {
-  params: Joi.object().keys({
+params: Joi.object().keys({
     bookingId: Joi.string().custom(objectId).required(),
-  }),
-  body: Joi.object().keys({
+}),
+body: Joi.object().keys({
     reason: Joi.string().required(),
-  }),
+}),
 }
 
-/**
- * Delete booking validation schema
- */
 const deleteBooking = {
-  params: Joi.object().keys({
+params: Joi.object().keys({
     bookingId: Joi.string().custom(objectId).required(),
-  }),
+}),
 }
 
 module.exports = {
-  getBookingById,
-  getBookingsByUser,
-  createBooking,
-  updateBooking,
-  confirmBooking,
-  cancelBooking,
-  deleteBooking,
+getBookingById,
+getBookingsByUser,
+getBookingsByEmailOrPhone,
+createBooking,
+updateBooking,
+confirmBooking,
+cancelBooking,
+deleteBooking,
 }

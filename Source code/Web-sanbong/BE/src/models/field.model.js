@@ -1,6 +1,7 @@
 const { ObjectId } = require("mongodb")
 const { getDb } = require("../config/database")
 const constants = require("../config/constants")
+const { getDefaultTimeSlots } = require("../utils/timeSlot.util")
 
 /**
  * Field schema
@@ -35,6 +36,7 @@ const createField = async (fieldData) => {
 
   const field = {
     ...fieldData,
+    defaultTimeSlots: getDefaultTimeSlots(),
     _id: new ObjectId(),
     createdAt: new Date(),
   }

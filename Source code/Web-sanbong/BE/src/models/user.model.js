@@ -45,11 +45,23 @@ const createUser = async (userData) => {
 /**
  * Get all users
  * @param {Object} filter - Filter criteria
+ * @param {number} limit - Maximum number of results
+ * @param {number} skip - Number of documents to skip
  * @returns {Promise<User[]>} List of users
  */
-const getUsers = async (filter = {}) => {
+const getUsers = async (filter = {}, limit = 10, skip = 0) => {
   const collection = getUsersCollection()
-  return collection.find(filter).toArray()
+  return collection.find(filter).skip(skip).limit(limit).toArray()
+}
+
+/**
+ * Count users based on filter
+ * @param {Object} filter - Filter criteria
+ * @returns {Promise<number>} Count of users
+ */
+const countUsers = async (filter = {}) => {
+  const collection = getUsersCollection()
+  return collection.countDocuments(filter)
 }
 
 /**
@@ -97,7 +109,7 @@ const updateUser = async (id, updateData) => {
     { returnDocument: "after" },
   )
 
-  return result
+  return result.value
 }
 
 /**
@@ -114,6 +126,7 @@ const deleteUser = async (id) => {
 module.exports = {
   createUser,
   getUsers,
+  countUsers,
   getUserById,
   getUserByEmail,
   getUserByPhone,

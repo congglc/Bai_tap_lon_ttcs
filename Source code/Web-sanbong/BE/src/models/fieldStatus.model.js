@@ -1,6 +1,8 @@
 const { ObjectId } = require("mongodb")
 const { getDb } = require("../config/database")
 const constants = require("../config/constants")
+const fieldModel = require("./field.model")
+const { v4: uuidv4 } = require("uuid")
 
 /**
  * Field Status schema
@@ -28,36 +30,80 @@ const getFieldStatusCollection = () => {
  * Create or update field status
  * @param {string} fieldId - Field ID
  * @param {string} date - Date in YYYY-MM-DD format
- * @param {Array} timeSlots - Array of time slots
+ * @param {Array} timeSlots - Array of time slots to update/set.
  * @returns {Promise<FieldStatus>} Field status document
  */
 const createOrUpdateFieldStatus = async (fieldId, date, timeSlots) => {
   const collection = getFieldStatusCollection()
 
   const filter = {
-    fieldId: new ObjectId(fieldId),
-    date,
+    fieldId: (typeof fieldId === 'object' && fieldId._bsontype === 'ObjectId' && fieldId.toHexString) ? fieldId.toHexString() : fieldId.toString(),
+    date: (typeof date === 'string' && date.length === 10) ? new Date(date + 'T00:00:00.000Z') : new Date(date),
   }
 
-  const update = {
-    $set: {
-      fieldId: new ObjectId(fieldId),
-      date,
-      timeSlots,
-      updatedAt: new Date(),
-    },
-    $setOnInsert: {
+  // Try to find the existing document first
+  let fieldStatus = await collection.findOne(filter)
+
+  if (!fieldStatus) {
+    console.log(`FieldStatus document not found for field ${fieldId} on date ${date}. Attempting to create new one.`)
+    // If document does not exist, create a new one with default time slots
+    const field = await fieldModel.getFieldById(fieldId)
+
+    if (!field) {
+      console.warn(`Field ${fieldId} not found when creating FieldStatus. Creating with empty timeSlots.`)
+    }
+
+    if (!field || !field.defaultTimeSlots || field.defaultTimeSlots.length === 0) {
+      // Handle case where field or its default slots are missing - perhaps create with empty slots or throw error
+      if (field) console.warn(`Field ${fieldId} found, but defaultTimeSlots missing or empty (length: ${field.defaultTimeSlots ? field.defaultTimeSlots.length : 'N/A'}). Creating FieldStatus with empty timeSlots.`)
+      const newFieldStatusDoc = {
+        fieldId: (typeof fieldId === 'object' && fieldId._bsontype === 'ObjectId' && fieldId.toHexString) ? fieldId.toHexString() : fieldId.toString(),
+        date: (typeof date === 'string' && date.length === 10) ? new Date(date + 'T00:00:00.000Z') : new Date(date),
+        timeSlots: [], // Create with empty array if defaults are missing
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      await collection.insertOne(newFieldStatusDoc)
+      console.log(`Created FieldStatus document with empty timeSlots for field ${fieldId} on date ${date}.`)
+      return newFieldStatusDoc // Return the newly created empty document
+    }
+
+    // Generate default slots with consistent UUIDs
+    const defaultSlotsWithIds = field.defaultTimeSlots.map(slot => ({
+      id: uuidv4(), // Generate consistent UUIDs
+      time: slot.time,
+      status: constants.fieldStatus.AVAILABLE,
+      price: slot.price,
+      bookedBy: null,
+      note: null,
+    }))
+
+    const newFieldStatusDoc = {
+      fieldId: (typeof fieldId === 'object' && fieldId._bsontype === 'ObjectId' && fieldId.toHexString) ? fieldId.toHexString() : fieldId.toString(),
+      date: (typeof date === 'string' && date.length === 10) ? new Date(date + 'T00:00:00.000Z') : new Date(date),
+      timeSlots: defaultSlotsWithIds, // Populate with default slots
       createdAt: new Date(),
-    },
-  }
+      updatedAt: new Date(),
+    }
 
-  const options = {
-    upsert: true,
-    returnDocument: "after",
+    // Insert the new document
+    await collection.insertOne(newFieldStatusDoc)
+    console.log(`Created FieldStatus document with default timeSlots for field ${fieldId} on date ${date}.`)
+    return newFieldStatusDoc // Return the newly created document
+  } else {
+    // If document exists, update its time slots with the provided timeSlots array
+    console.log(`FieldStatus document found for field ${fieldId} on date ${date}. Updating timeSlots.`)
+    const update = {
+      $set: {
+        timeSlots: timeSlots, // Overwrite with provided timeSlots array (from service)
+        updatedAt: new Date(),
+      },
+    }
+    const options = { returnDocument: "after" }
+    const result = await collection.findOneAndUpdate(filter, update, options)
+    console.log(`Updated FieldStatus document for field ${fieldId} on date ${date}.`)
+    return result.value // Return the updated document
   }
-
-  const result = await collection.findOneAndUpdate(filter, update, options)
-  return result
 }
 
 /**
@@ -67,7 +113,13 @@ const createOrUpdateFieldStatus = async (fieldId, date, timeSlots) => {
  */
 const getFieldStatusByDate = async (date) => {
   const collection = getFieldStatusCollection()
-  return collection.find({ date }).toArray()
+  let dateQuery = date
+  if (typeof date === 'string' && date.length === 10) {
+    dateQuery = new Date(date + 'T00:00:00.000Z')
+  } else if (typeof date === 'string') {
+    dateQuery = new Date(date)
+  }
+  return collection.find({ date: dateQuery }).toArray()
 }
 
 /**
@@ -78,9 +130,22 @@ const getFieldStatusByDate = async (date) => {
  */
 const getFieldStatusByFieldAndDate = async (fieldId, date) => {
   const collection = getFieldStatusCollection()
+  let idStr = fieldId
+  if (typeof fieldId === 'object' && fieldId._bsontype === 'ObjectId' && fieldId.toHexString) {
+    idStr = fieldId.toHexString()
+  } else if (typeof fieldId === 'object' && fieldId.toString) {
+    idStr = fieldId.toString()
+  }
+  // Đảm bảo date là Date object
+  let dateQuery = date
+  if (typeof date === 'string' && date.length === 10) {
+    dateQuery = new Date(date + 'T00:00:00.000Z')
+  } else if (typeof date === 'string') {
+    dateQuery = new Date(date)
+  }
   return collection.findOne({
-    fieldId: new ObjectId(fieldId),
-    date,
+    fieldId: idStr,
+    date: dateQuery,
   })
 }
 
@@ -104,7 +169,7 @@ const updateTimeSlotStatus = async (fieldId, date, slotId, updateData) => {
 
   // Update the specific time slot
   const updatedTimeSlots = fieldStatus.timeSlots.map((slot) => {
-    if (slot.id === slotId) {
+    if (slot.id === slotId || (slot._id && slot._id.toString() === slotId)) {
       return { ...slot, ...updateData }
     }
     return slot

@@ -21,6 +21,7 @@ import FieldStatus from "pages/admin/field-status"
 import ClubApplications from "pages/admin/club-applications"
 import OrderManagement from "pages/admin/order"
 import UserManagement from "pages/admin/users"
+import ProtectedRouteAdmin from "./components/ProtectedRouteAdmin"
 
 const renderUserRouter = () => {
   const UserRouters = [
@@ -83,41 +84,34 @@ const renderUserRouter = () => {
 const renderAdminRouter = () => {
   // Thêm route cho trang Statistics vào AdminRouters
   const AdminRouters = [
-    {
-      path: ROUTERS.ADMIN.LOGIN,
-      component: <Login />,
-    },
-    {
-      path: ROUTERS.ADMIN.DASHBOARD,
-      component: <Dashboard />,
-    },
-    {
-      path: ROUTERS.ADMIN.ADD_FIELD,
-      component: <AddField />,
-    },
-    {
-      path: ROUTERS.ADMIN.FIELD_STATUS,
-      component: <FieldStatus />,
-    },
-    {
-      path: ROUTERS.ADMIN.CLUB_APPLICATIONS,
-      component: <ClubApplications />,
-    },
-    {
-      path: ROUTERS.ADMIN.ORDER,
-      component: <OrderManagement />,
-    },
-    {
-      path: ROUTERS.ADMIN.USERS,
-      component: <UserManagement />,
-    },
+    // Route login không cần bảo vệ
+    { path: ROUTERS.ADMIN.LOGIN, component: <Login /> },
+    // Các route admin khác cần bảo vệ
+    { path: ROUTERS.ADMIN.DASHBOARD, component: <Dashboard /> },
+    { path: ROUTERS.ADMIN.ADD_FIELD, component: <AddField /> },
+    { path: ROUTERS.ADMIN.FIELD_STATUS, component: <FieldStatus /> },
+    { path: ROUTERS.ADMIN.CLUB_APPLICATIONS, component: <ClubApplications /> },
+    { path: ROUTERS.ADMIN.ORDER, component: <OrderManagement /> },
+    { path: ROUTERS.ADMIN.USERS, component: <UserManagement /> },
   ]
+
+  // Tách riêng route login
+  const loginRoute = AdminRouters.find(route => route.path === ROUTERS.ADMIN.LOGIN);
+  const protectedAdminRoutes = AdminRouters.filter(route => route.path !== ROUTERS.ADMIN.LOGIN);
+
   return (
+    // MasterAdminLayout bao quanh các route admin cần bảo vệ
     <MasterAdminLayout>
       <Routes>
-        {AdminRouters.map((item, key) => (
-          <Route key={key} path={item.path} element={item.component} />
-        ))}
+        {/* Route login */}
+        {loginRoute && <Route key={loginRoute.path} path={loginRoute.path} element={loginRoute.component} />}
+
+        {/* Nhóm các route cần bảo vệ dưới ProtectedRouteAdmin */}
+        <Route element={<ProtectedRouteAdmin />}>
+          {protectedAdminRoutes.map((item, key) => (
+            <Route key={key} path={item.path} element={item.component} />
+          ))}
+        </Route>
       </Routes>
     </MasterAdminLayout>
   )

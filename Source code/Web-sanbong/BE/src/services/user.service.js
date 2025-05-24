@@ -4,14 +4,25 @@ const bcrypt = require("bcryptjs")
 /**
  * Get all users
  * @param {Object} filter - Filter criteria
+ * @param {number} limit - Maximum number of results
+ * @param {number} skip - Number of documents to skip
  * @returns {Promise<Array>} List of users
  */
-const getUsers = async (filter = {}) => {
-  const users = await userModel.getUsers(filter)
+const getUsers = async (filter = {}, limit = 10, skip = 0) => {
+  const users = await userModel.getUsers(filter, limit, skip)
   return users.map((user) => {
     const { password, ...userWithoutPassword } = user
     return userWithoutPassword
   })
+}
+
+/**
+ * Count users based on filter
+ * @param {Object} filter - Filter criteria
+ * @returns {Promise<number>} Count of users
+ */
+const countUsers = async (filter = {}) => {
+  return userModel.countUsers(filter)
 }
 
 /**
@@ -44,7 +55,10 @@ const getUserByEmailOrPhone = async (email, phone) => {
     user = await userModel.getUserByPhone(phone)
   }
 
-  return user
+  if (!user) return null
+
+  const { password, ...userWithoutPassword } = user
+  return userWithoutPassword
 }
 
 /**
@@ -93,6 +107,7 @@ const deleteUser = async (id) => {
 
 module.exports = {
   getUsers,
+  countUsers,
   getUserById,
   getUserByEmailOrPhone,
   createUser,
