@@ -240,6 +240,20 @@ const MyBookings = () => {
                     </p>
                   </>
                 )}
+
+                {selectedBooking.status === "pending" && (
+                  <button className="pay-again-btn" onClick={() => {
+                    // Lưu thông tin booking để truyền sang modal thanh toán
+                    localStorage.setItem("payBookingInfo", JSON.stringify({
+                      bookingId: selectedBooking._id,
+                      teamLeaderName: selectedBooking.teamLeaderName,
+                      contact: selectedBooking.contact,
+                      price: selectedBooking.price,
+                      transferContent: `DATSAN-${selectedBooking._id}-${selectedBooking.teamLeaderName}-${selectedBooking.contact}`
+                    }));
+                    window.location.href = "/thanh-toan?payBooking=1";
+                  }}>Thanh toán</button>
+                )}
               </div>
             </div>
           </div>

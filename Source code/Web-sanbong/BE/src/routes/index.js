@@ -6,6 +6,7 @@ const bookingRoutes = require("./booking.routes")
 const clubApplicationRoutes = require("./clubApplication.routes")
 const fieldStatusRoutes = require("./fieldStatus.routes")
 const uploadRoutes = require("./upload.routes") // Add this line
+const qrRoutes = require("./qr.route")
 
 const router = express.Router()
 
@@ -19,5 +20,6 @@ router.use("/bookings", bookingRoutes)
 router.use("/club-applications", clubApplicationRoutes)
 router.use("/field-status", fieldStatusRoutes)
 router.use("/uploads", uploadRoutes) // Add this line
+router.use("/qr", qrRoutes)
 
 module.exports = router
