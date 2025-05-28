@@ -14,7 +14,8 @@ import { formatDateForAPI } from "../../../../utils/formatDate"
 import Modal from "react-modal"
 import axios from "axios"
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081/api";
+const API_URL = process.env.REACT_APP_API_URL 
+
 
 // Helper function to format time slot string to HH:mm-HH:mm
 const formatTimeSlotForBackend = (timeSlotString) => {
@@ -61,6 +62,7 @@ const BANK_INFO = {
 };
 const DEPOSIT_AMOUNT = 100000;
 
+
 const Payment = () => {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [fields, setFields] = useState([])
@@ -78,6 +80,7 @@ const Payment = () => {
   const [error, setError] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
+
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [qrUrl, setQrUrl] = useState("")
   const [bookingInfo, setBookingInfo] = useState(null)
@@ -117,6 +120,7 @@ const Payment = () => {
           .filter((slot) => slot.status === "available")
           .map((slot) => slot.time)
 
+
         setAvailableTimeSlots(availableSlots)
 
         // If current selected time is not available, reset it
@@ -155,6 +159,7 @@ const Payment = () => {
 
     fetchFields()
 
+
     // Check if booking info is passed from previous page
     if (location.state && location.state.bookingInfo) {
       const { field, date, timeSlot, price } = location.state.bookingInfo
@@ -163,7 +168,6 @@ const Payment = () => {
       setSelectedTime(timeSlot)
       setPrice(price)
     }
-
     // Check nếu có yêu cầu thanh toán lại từ đơn cũ
     const params = new URLSearchParams(window.location.search);
     if (params.get("payBooking") === "1") {
@@ -187,6 +191,7 @@ const Payment = () => {
     if (selectedField && selectedDate) {
       fetchAvailableTimeSlots(selectedField, selectedDate)
     }
+
   }, [selectedField, selectedDate])
 
   // Update price when field, time or date changes
@@ -243,6 +248,7 @@ const Payment = () => {
 
   const handleBooking = async () => {
     if (!confirmed || !selectedField || !selectedTime) {
+
       alert("Vui lòng điền đầy đủ thông tin và xác nhận!");
       return;
     }
@@ -274,10 +280,12 @@ const Payment = () => {
       if (fieldStatusResponse.data.data.fieldStatus) {
         const slot = fieldStatusResponse.data.data.fieldStatus.timeSlots.find((slot) => slot.time === selectedTime);
         console.log("Slot tìm được:", slot);
+
         if (slot) {
           await fieldStatusAPI.updateTimeSlotStatus(selectedField, formattedDate, slot._id, {
             status: "booked",
             bookedBy: teamName,
+
           });
           console.log("Update slot thành công");
         } else {
@@ -303,6 +311,7 @@ const Payment = () => {
       alert("Không thể đặt sân. Vui lòng thử lại sau.");
     } finally {
       setIsLoading(false);
+
     }
   };
 
@@ -505,6 +514,7 @@ const Payment = () => {
           </>
         )}
       </Modal>
+
     </div>
   )
 }

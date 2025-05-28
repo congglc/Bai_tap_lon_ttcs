@@ -74,6 +74,7 @@ const getBookingsByUser = async (userId, limit = 10, skip = 0, status = null) =>
  * @returns {Promise<Object>} Created booking
  */
 const createBooking = async (bookingData) => {
+
   // Store the original time format from frontend
   const originalTime = bookingData.time;
   
@@ -120,12 +121,15 @@ const createBooking = async (bookingData) => {
     bookingData.originalTimeSlot = matchingSlot.time; // Store the field status time format
   }
   
+
   // Check for existing confirmed bookings for the same field, date, and time
   const existingBookings = await bookingModel.getBookings({
     fieldId: bookingData.fieldId,
     date: bookingData.date,
     time: bookingData.time,
+
     status: constants.bookingStatus.CONFIRMED,
+
   });
 
   // If any confirmed booking exists for this slot, throw an error
@@ -139,6 +143,7 @@ const createBooking = async (bookingData) => {
     console.log(`Ensured FieldStatus document exists for field ${bookingData.fieldId} on date ${bookingData.date}`);
   } catch (fsError) {
     console.error(`Error ensuring FieldStatus document exists: ${fsError.message}`);
+
   }
 
   // Convert userId to ObjectId if it's a string
@@ -154,6 +159,7 @@ const createBooking = async (bookingData) => {
   // Create booking
   const booking = await bookingModel.createBooking(bookingData);
   return booking;
+
 }
 
 /**
@@ -239,12 +245,14 @@ const confirmBooking = async (id) => {
           } catch (err) {
             console.error('ERROR khi updateTimeSlotStatus:', err);
           }
+
         } else {
           console.warn('Không tìm thấy slot phù hợp với time =', booking.time, 'trong field-status!');
         }
       } else {
         console.warn('Field status document not found hoặc timeSlots array missing cho field', booking.fieldId, 'date', dateStr);
       }
+
     } catch (fsUpdateError) {
       console.error('Error updating field status for confirmed booking', booking._id, ':', fsUpdateError);
     }
@@ -371,6 +379,7 @@ function timeSlotMatches(bookingTime, fieldStatusTime) {
     bookingParts.endMinute === fieldParts.endMinute
   );
 }
+
 
 module.exports = {
   getBookings,
